@@ -59,6 +59,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": ["charles-ms-7e26.tail754593.ts.net"]
+          },
           "configurations": {
             "production": {
               "buildTarget": "ung-do:build:production"
