@@ -1,41 +1,47 @@
 import { Component, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { Todo } from './todo';
 
-/** A single to-do row: completion toggle, title (inline-editable), delete. */
+/** A single to-do row: animated completion toggle, title (inline-editable), delete. */
 @Component({
   selector: 'app-todo-item',
   standalone: true,
-  imports: [FormsModule, MatCheckboxModule, MatIconModule],
+  imports: [FormsModule, MatIconModule],
   template: `
-    <li
-      class="group flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition hover:shadow"
-      [class.opacity-60]="todo().completed"
+    <div
+      class="item"
+      [class.is-completed]="todo().completed"
+      role="listitem"
     >
-      <mat-checkbox
-        [checked]="todo().completed"
-        (change)="toggle.emit(!todo().completed)"
-        [aria-label]="'Mark ' + todo().title + ' complete'"
-      />
+      <button
+        type="button"
+        class="check"
+        [class.checked]="todo().completed"
+        (click)="toggle.emit(!todo().completed)"
+        [aria-pressed]="todo().completed"
+        [aria-label]="'Mark ' + todo().title + ' ' + (todo().completed ? 'not done' : 'complete')"
+      >
+        <mat-icon>check</mat-icon>
+      </button>
 
       @if (editing()) {
-        <form class="flex-1" (ngSubmit)="save()">
+        <form class="editor" (ngSubmit)="save()">
           <input
             #edit
             name="edit-title"
-            class="w-full rounded-md border border-neutral-300 px-2 py-1 text-neutral-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            class="editor-input"
             [ngModel]="draft()"
             (ngModelChange)="draft.set($event)"
+            (blur)="save()"
             aria-label="Edit title"
           />
+          <button type="submit" class="editor-btn">Save</button>
         </form>
       } @else {
         <button
           type="button"
-          class="flex-1 truncate text-left text-neutral-900"
-          [class.line-through]="todo().completed"
+          class="title"
           (click)="startEdit()"
           [title]="'Edit ' + todo().title"
         >
@@ -45,13 +51,13 @@ import { Todo } from './todo';
 
       <button
         type="button"
-        class="text-neutral-400 transition hover:text-red-500"
+        class="action delete"
         (click)="remove.emit()"
         [aria-label]="'Delete ' + todo().title"
       >
-        <mat-icon>close</mat-icon>
+        <mat-icon>delete</mat-icon>
       </button>
-    </li>
+    </div>
   `,
   styleUrl: './todo-item.scss',
 })
@@ -75,6 +81,7 @@ export class TodoItem {
   }
 
   protected save(): void {
+    if (!this.editing()) return;
     const trimmed = this.draft().trim();
     this.editing.set(false);
     if (trimmed && trimmed !== this.todo().title) {

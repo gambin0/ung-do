@@ -74,7 +74,7 @@ describe('Todos component rendering', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const html = (fixture.nativeElement as HTMLElement).innerHTML;
-    expect(html).toContain('No to-dos yet');
+    expect(html).toContain('Nothing here yet');
   });
 
   it('renders a row for each to-do', async () => {
