@@ -30,6 +30,76 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
 }
 
+/* ---- Reorder handle ---------------------------------------------------- */
+.handle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.55;
+  transition:
+    opacity 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+.handle .material-symbols-outlined {
+  font-size: 21px;
+  transition: transform 0.18s ease;
+}
+.item:hover .handle,
+.handle:focus-visible {
+  opacity: 1;
+}
+.handle:hover {
+  color: var(--brand-500);
+  background: rgba(59, 130, 246, 0.08);
+}
+.handle:active {
+  cursor: grabbing;
+}
+.handle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* ---- Drag state -------------------------------------------------------- */
+.item.is-dragging {
+  opacity: 0.35;
+  transform: scale(0.985);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: none;
+}
+
+/* Drop-position indicator: a glowing line at the top or bottom edge of the
+   row that will receive the dragged item. */
+.item.drop-before::before,
+.item.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 3px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-400), var(--brand-600));
+  box-shadow: 0 0 10px 1px rgba(59, 130, 246, 0.55);
+  pointer-events: none;
+  z-index: 2;
+}
+.item.drop-before::before {
+  top: -7px;
+}
+.item.drop-after::after {
+  bottom: -7px;
+}
+
 /* ---- Custom checkbox --------------------------------------------------- */
 .check {
   position: relative;

@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { TodoItem } from './todo-item';
 import { TodoService } from './todo-service';
-import { Filter } from './todo';
+import { applyVisibleOrder } from './order';
+import { Filter, Todo } from './todo';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -130,11 +131,18 @@ const FILTERS: { key: Filter; label: string }[] = [
                       (toggle)="toggle(t.id, $event)"
                       (update)="updateTitle(t.id, $event)"
                       (remove)="remove(t.id)"
+                      (dragStart)="onDragStart(t)"
+                      (dragEnd)="onDragEnd()"
+                      (move)="onKeyMove(t, $event)"
+                      [dropSide]="dropSideFor(t.id)"
+                      (dragover)="onDragOver($event, t)"
+                      (drop)="onDrop($event)"
                     />
                   </li>
                 }
               </ul>
             }
+            <p class="visually-hidden" aria-live="polite">{{ announce() }}</p>
           </div>
         </section>
 
@@ -157,6 +165,13 @@ export class Todos implements OnInit {
   protected readonly todos = computed(() => this.service.todos());
   protected readonly counts = computed(() => this.service.counts());
   protected readonly error = computed(() => this.service.error());
+
+  /** The to-do id currently being dragged, or null. */
+  protected readonly draggedId = signal<number | null>(null);
+  /** Where the drop indicator currently points, or null. */
+  protected readonly dropTarget = signal<{ id: number; side: 'before' | 'after' } | null>(null);
+  /** Screen-reader announcement for keyboard reordering. */
+  protected readonly announce = signal('');
 
   protected readonly pct = computed(() => {
     const c = this.counts();
@@ -263,5 +278,84 @@ export class Todos implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  // ---- Drag-to-reorder ----------------------------------------------------
+
+  /** Which indicator side (if any) to draw on a given row. */
+  protected dropSideFor(id: number): 'before' | 'after' | null {
+    const t = this.dropTarget();
+    if (!t || t.id !== id) return null;
+    return t.side;
+  }
+
+  protected onDragStart(todo: Todo): void {
+    this.draggedId.set(todo.id);
+    this.dropTarget.set(null);
+  }
+
+  protected onDragOver(event: DragEvent, hovered: Todo): void {
+    const dragged = this.draggedId();
+    if (dragged === null || dragged === hovered.id) return;
+    // preventDefault is what makes this row a valid drop target.
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const side: 'before' | 'after' = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    const cur = this.dropTarget();
+    if (!cur || cur.id !== hovered.id || cur.side !== side) {
+      this.dropTarget.set({ id: hovered.id, side });
+    }
+  }
+
+  protected onDrop(event: DragEvent): void {
+    event.preventDefault();
+    const dragged = this.draggedId();
+    const target = this.dropTarget();
+    this.draggedId.set(null);
+    this.dropTarget.set(null);
+    if (dragged === null || !target) return;
+
+    const visible = this.todos();
+    const draggedTodo = visible.find((t) => t.id === dragged);
+    if (!draggedTodo) return;
+
+    const without = visible.filter((t) => t.id !== dragged);
+    const hoveredIndex = without.findIndex((t) => t.id === target.id);
+    if (hoveredIndex === -1) return; // dropped over the dragged row itself
+    const insertAt = target.side === 'before' ? hoveredIndex : hoveredIndex + 1;
+    const newVisible = [
+      ...without.slice(0, insertAt),
+      draggedTodo,
+      ...without.slice(insertAt),
+    ];
+
+    // A drop back onto the same slot is a no-op: no round-trip, no announcement.
+    if (newVisible.every((t, i) => visible[i]?.id === t.id)) return;
+
+    const newFull = applyVisibleOrder(this.service.allTodos(), visible, newVisible);
+    void this.service.reorder(newFull);
+  }
+
+  protected onDragEnd(): void {
+    this.draggedId.set(null);
+    this.dropTarget.set(null);
+  }
+
+  /** Alt+ArrowUp/ArrowDown on a row's handle: move it one visible slot. */
+  protected onKeyMove(todo: Todo, dir: number): void {
+    const step = dir < 0 ? -1 : 1;
+    const visible = this.todos();
+    const from = visible.findIndex((t) => t.id === todo.id);
+    const to = from + step;
+    if (from === -1 || to < 0 || to >= visible.length) {
+      this.announce.set(`${todo.title} cannot move ${step === -1 ? 'up' : 'down'} further`);
+      return;
+    }
+    const newVisible = [...visible];
+    [newVisible[from], newVisible[to]] = [newVisible[to], newVisible[from]];
+    const newFull = applyVisibleOrder(this.service.allTodos(), visible, newVisible);
+    void this.service.reorder(newFull);
+    this.announce.set(`${todo.title} moved to position ${to + 1} of ${visible.length}`);
   }
 }

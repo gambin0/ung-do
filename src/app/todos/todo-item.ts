@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Todo } from './todo';
 
-/** A single to-do row: animated completion toggle, title (inline-editable), delete. */
+/** A single to-do row: drag handle, animated completion toggle, title (inline-editable), delete. */
 @Component({
   selector: 'app-todo-item',
   standalone: true,
@@ -12,8 +12,27 @@ import { Todo } from './todo';
     <div
       class="item"
       [class.is-completed]="todo().completed"
+      [class.is-dragging]="dragging()"
+      [class.drop-before]="dropSide() === 'before'"
+      [class.drop-after]="dropSide() === 'after'"
+      [attr.draggable]="armed() || null"
+      (dragstart)="onDragStart($event)"
+      (dragend)="onDragEnd($event)"
+      (dragover)="dragOver.emit($event)"
+      (drop)="dropped.emit($event)"
       role="listitem"
     >
+      <button
+        type="button"
+        class="handle"
+        (mousedown)="arm()"
+        (keydown.alt.arrowup)="move.emit(-1)"
+        (keydown.alt.arrowdown)="move.emit(1)"
+        [aria-label]="'Reorder ' + todo().title + '. Press Alt and the arrow keys to move.'"
+      >
+        <mat-icon>drag_indicator</mat-icon>
+      </button>
+
       <button
         type="button"
         class="check"
@@ -71,9 +90,48 @@ export class TodoItem {
   readonly update = output<string>();
   /** Fired when the user deletes the row. */
   readonly remove = output<void>();
+  /** Fired when a drag begins on this row. */
+  readonly dragStart = output<DragEvent>();
+  /** Fired when a drag started on this row ends (drop or cancel). */
+  readonly dragEnd = output<DragEvent>();
+  /** Fired by Alt+ArrowUp/ArrowDown on the handle: -1 = up, +1 = down. */
+  readonly move = output<number>();
+  /** Where the drop indicator sits relative to this row, or null. */
+  readonly dropSide = input<'before' | 'after' | null>(null);
+  /** Pointer is hovering this row with a drag in flight. */
+  readonly dragOver = output<DragEvent>();
+  /** The pointer was released over this row. */
+  readonly dropped = output<DragEvent>();
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
+  /** True once the user presses the handle, so only armed rows are draggable. */
+  protected readonly armed = signal(false);
+  protected readonly dragging = signal(false);
+
+  protected arm(): void {
+    this.armed.set(true);
+  }
+
+  protected onDragStart(event: DragEvent): void {
+    if (!this.armed()) {
+      // The row was not armed via the handle: cancel the drag.
+      event.preventDefault();
+      return;
+    }
+    this.dragging.set(true);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(this.todo().id));
+    }
+    this.dragStart.emit(event);
+  }
+
+  protected onDragEnd(event: DragEvent): void {
+    this.dragging.set(false);
+    this.armed.set(false);
+    this.dragEnd.emit(event);
+  }
 
   protected startEdit(): void {
     this.draft.set(this.todo().title);

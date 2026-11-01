@@ -88,4 +88,28 @@ export class TodoService {
   setFilter(filter: Filter): void {
     this.filter.set(filter);
   }
+
+  /**
+   * Reorder the full list (top first). Optimistically applies the new order,
+   * then persists it via `PUT /api/todos/order`. On failure the previous order
+   * is restored and the error signal is set.
+   */
+  async reorder(newFullOrder: Todo[]): Promise<void> {
+    const previous = this.allTodos();
+    this.allTodos.set(newFullOrder);
+    try {
+      const res = await fetch(`${this.api}/order`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: newFullOrder.map((t) => t.id) }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+    } catch (e) {
+      this.allTodos.set(previous);
+      this.error.set((e as Error).message || 'failed to save order');
+    }
+  }
 }

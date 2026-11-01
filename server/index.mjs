@@ -3,7 +3,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb, list, create, update, remove } from './db.mjs';
+import { openDb, list, create, update, remove, reorder } from './db.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.PORT || 3000);
@@ -32,11 +32,19 @@ function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host ?? HOST}`);
   const m = url.pathname.match(/^\/api\/todos(?:\/(\d+))?$/);
+  const isOrder = url.pathname === '/api/todos/order';
 
   try {
-    // Only /api/todos and /api/todos/:id are served.
-    if (!m) return sendJson(res, 404, { error: 'not found' });
-    const id = m[1] ? Number(m[1]) : null;
+    // Only /api/todos, /api/todos/order, and /api/todos/:id are served.
+    if (!m && !isOrder) return sendJson(res, 404, { error: 'not found' });
+    const id = m?.[1] ? Number(m[1]) : null;
+
+    if (req.method === 'PUT' && isOrder) {
+      const body = await readBody(req);
+      const updated = reorder(db, body?.ids);
+      if (!updated) return sendJson(res, 400, { error: 'ids must be a list containing every to-do id exactly once' });
+      return sendJson(res, 200, { ok: true });
+    }
 
     if (req.method === 'GET' && id === null) {
       const status = url.searchParams.get('status') ?? 'all';

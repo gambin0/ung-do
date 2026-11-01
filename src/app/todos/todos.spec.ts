@@ -38,6 +38,45 @@ describe('TodoService filter logic', () => {
   });
 });
 
+describe('TodoService reorder', () => {
+  it('applies the new order and persists it on success', async () => {
+    const svc = new TodoService();
+    const fetchStub = vi.spyOn(globalThis, 'fetch');
+    fetchStub
+      .mockResolvedValueOnce(new Response(JSON.stringify({ todos: SAMPLE }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    await svc.load();
+    await svc.reorder([SAMPLE[2], SAMPLE[0], SAMPLE[1]]);
+
+    expect(svc.allTodos().map((t) => t.id)).toEqual([3, 1, 2]);
+    expect(svc.error()).toBeNull();
+    const calls = fetchStub.mock.calls.filter((c) => String(c[0]).includes('/order'));
+    expect(calls.length).toBe(1);
+    expect(JSON.parse((calls[0][1] as RequestInit).body as string)).toEqual({ ids: [3, 1, 2] });
+    fetchStub.mockRestore();
+  });
+
+  it('reverts to the previous order and sets the error signal on failure', async () => {
+    const svc = new TodoService();
+    const fetchStub = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/order')) {
+          return new Response(JSON.stringify({ error: 'bad order' }), { status: 400 });
+        }
+        return new Response(JSON.stringify({ todos: SAMPLE }), { status: 200 });
+      });
+
+    await svc.load();
+    await svc.reorder([SAMPLE[2], SAMPLE[0], SAMPLE[1]]);
+
+    expect(svc.allTodos().map((t) => t.id)).toEqual([1, 2, 3]);
+    expect(svc.error()).toBe('bad order');
+    fetchStub.mockRestore();
+  });
+});
+
 function mockService(todos: Todo[], filter: Filter = 'all', error: string | null = null) {
   const filterSig = signal(filter);
   return {
@@ -101,5 +140,53 @@ describe('Todos component rendering', () => {
     await fixture.whenStable();
     const html = (fixture.nativeElement as HTMLElement).innerHTML;
     expect(html).toContain('Backend unavailable');
+  });
+
+  it('renders a reorder handle on each row', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Todos],
+      providers: [{ provide: TodoService, useValue: mockService(SAMPLE) }],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(Todos);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const handles = compiled.querySelectorAll('app-todo-item .handle');
+    expect(handles.length).toBe(3);
+    expect(handles[0].querySelector('mat-icon')?.textContent).toContain('drag_indicator');
+  });
+
+  it('does not make a row draggable until its handle is pressed', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Todos],
+      providers: [{ provide: TodoService, useValue: mockService(SAMPLE) }],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(Todos);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const item = compiled.querySelector('app-todo-item .item') as HTMLElement;
+    expect(item.draggable).toBe(false); // attribute absent until armed
+
+    const handle = compiled.querySelector('app-todo-item .handle') as HTMLButtonElement;
+    handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    fixture.detectChanges();
+    expect(item.draggable).toBe(true);
+  });
+
+  it('exposes a live region for keyboard reorder announcements', async () => {
+    await TestBed.configureTestingModule({
+      imports: [Todos],
+      providers: [{ provide: TodoService, useValue: mockService(SAMPLE) }],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(Todos);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const live = compiled.querySelector('.visually-hidden[aria-live="polite"]');
+    expect(live).toBeTruthy();
   });
 });
