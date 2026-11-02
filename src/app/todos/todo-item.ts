@@ -19,21 +19,17 @@ function toDatetimeLocal(iso: string): string {
   template: `
     <div
       class="item"
+      [attr.data-id]="todo().id"
       [class.is-completed]="todo().completed"
       [class.is-dragging]="dragging()"
       [class.drop-before]="dropSide() === 'before'"
       [class.drop-after]="dropSide() === 'after'"
-      [attr.draggable]="armed() || null"
-      (dragstart)="onDragStart($event)"
-      (dragend)="onDragEnd($event)"
-      (dragover)="dragOver.emit($event)"
-      (drop)="dropped.emit($event)"
       role="listitem"
     >
       <button
         type="button"
         class="handle"
-        (mousedown)="arm()"
+        (pointerdown)="onPointerDown($event)"
         (keydown.alt.arrowup)="move.emit(-1)"
         (keydown.alt.arrowdown)="move.emit(1)"
         [aria-label]="'Reorder ' + todo().title + '. Press Alt and the arrow keys to move.'"
@@ -131,17 +127,17 @@ export class TodoItem {
   /** Fired when the user deletes the row. */
   readonly remove = output<void>();
   /** Fired when a drag begins on this row. */
-  readonly dragStart = output<DragEvent>();
+  readonly dragStart = output<{ id: number }>();
   /** Fired when a drag started on this row ends (drop or cancel). */
-  readonly dragEnd = output<DragEvent>();
+  readonly dragEnd = output<void>();
   /** Fired by Alt+ArrowUp/ArrowDown on the handle: -1 = up, +1 = down. */
   readonly move = output<number>();
   /** Where the drop indicator sits relative to this row, or null. */
   readonly dropSide = input<'before' | 'after' | null>(null);
   /** Pointer is hovering this row with a drag in flight. */
-  readonly dragOver = output<DragEvent>();
+  readonly dragOver = output<{ id: number; y: number }>();
   /** The pointer was released over this row. */
-  readonly dropped = output<DragEvent>();
+  readonly dropped = output<{ id: number; y: number }>();
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
@@ -156,32 +152,29 @@ export class TodoItem {
   protected formatDueDate = formatDueDate;
   protected formatAgo = formatAgo;
 
-  protected arm(): void {
-    this.armed.set(true);
-  }
-
   protected clearDue(): void {
     this.dueDraft.set('');
   }
 
-  protected onDragStart(event: DragEvent): void {
-    if (!this.armed()) {
-      // The row was not armed via the handle: cancel the drag.
-      event.preventDefault();
-      return;
-    }
+  protected onPointerDown(event: PointerEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
     this.dragging.set(true);
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(this.todo().id));
-    }
-    this.dragStart.emit(event);
-  }
+    this.dragStart.emit({ id: this.todo().id } as any);
 
-  protected onDragEnd(event: DragEvent): void {
-    this.dragging.set(false);
-    this.armed.set(false);
-    this.dragEnd.emit(event);
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      this.dragOver.emit({ id: this.todo().id, y: moveEvent.clientY } as any);
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      this.dragging.set(false);
+      this.dropped.emit({ id: this.todo().id, y: upEvent.clientY } as any);
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
   }
 
   protected startEdit(): void {

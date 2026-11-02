@@ -151,12 +151,12 @@ const FILTERS: { key: Filter; label: string }[] = [
                       (update)="updateTitle(t.id, $event)"
                       (updateDue)="updateDue(t.id, $event)"
                       (remove)="remove(t.id)"
-                      (dragStart)="onDragStart(t)"
+                      (dragStart)="onDragStart($event)"
                       (dragEnd)="onDragEnd()"
                       (move)="onKeyMove(t, $event)"
                       [dropSide]="dropSideFor(t.id)"
-                      (dragover)="onDragOver($event, t)"
-                      (drop)="onDrop($event)"
+                      (dragOver)="onDragOver($event)"
+                      (dropped)="onDrop($event)"
                     />
                   </li>
                 }
@@ -343,7 +343,7 @@ export class Todos implements OnInit {
     }
   }
 
-  // ---- Drag-to-reorder ----------------------------------------------------
+  // ---- Drag-to-reorder (pointer events for mobile + desktop) -------------
 
   /** Which indicator side (if any) to draw on a given row. */
   protected dropSideFor(id: number): 'before' | 'after' | null {
@@ -352,40 +352,37 @@ export class Todos implements OnInit {
     return t.side;
   }
 
-  protected onDragStart(todo: Todo): void {
-    this.draggedId.set(todo.id);
+  protected onDragStart(event: { id: number }): void {
+    this.draggedId.set(event.id);
     this.dropTarget.set(null);
   }
 
-  protected onDragOver(event: DragEvent, hovered: Todo): void {
+  protected onDragOver(event: { id: number; y: number }): void {
     const dragged = this.draggedId();
-    if (dragged === null || dragged === hovered.id) return;
-    // preventDefault is what makes this row a valid drop target.
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const side: 'before' | 'after' = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    if (dragged === null) return;
+
+    // Find the row under the pointer
+    const target = this.findDropTarget(event.y, dragged);
     const cur = this.dropTarget();
-    if (!cur || cur.id !== hovered.id || cur.side !== side) {
-      this.dropTarget.set({ id: hovered.id, side });
+    if (!cur || cur.id !== target.id || cur.side !== target.side) {
+      this.dropTarget.set(target);
     }
   }
 
-  protected onDrop(event: DragEvent): void {
-    event.preventDefault();
+  protected onDrop(event: { id: number; y: number }): void {
     const dragged = this.draggedId();
-    const target = this.dropTarget();
     this.draggedId.set(null);
     this.dropTarget.set(null);
-    if (dragged === null || !target) return;
+    if (dragged === null) return;
 
+    const target = this.findDropTarget(event.y, dragged);
     const visible = this.todos();
     const draggedTodo = visible.find((t) => t.id === dragged);
     if (!draggedTodo) return;
 
     const without = visible.filter((t) => t.id !== dragged);
     const hoveredIndex = without.findIndex((t) => t.id === target.id);
-    if (hoveredIndex === -1) return; // dropped over the dragged row itself
+    if (hoveredIndex === -1) return;
     const insertAt = target.side === 'before' ? hoveredIndex : hoveredIndex + 1;
     const newVisible = [
       ...without.slice(0, insertAt),
@@ -393,7 +390,7 @@ export class Todos implements OnInit {
       ...without.slice(insertAt),
     ];
 
-    // A drop back onto the same slot is a no-op: no round-trip, no announcement.
+    // A drop back onto the same slot is a no-op
     if (newVisible.every((t, i) => visible[i]?.id === t.id)) return;
 
     const newFull = applyVisibleOrder(this.service.allTodos(), visible, newVisible);
@@ -403,6 +400,35 @@ export class Todos implements OnInit {
   protected onDragEnd(): void {
     this.draggedId.set(null);
     this.dropTarget.set(null);
+  }
+
+  /** Find which row and side the pointer is over. */
+  private findDropTarget(y: number, draggedId: number): { id: number; side: 'before' | 'after' } {
+    const items = document.querySelectorAll('.item');
+    let best: { id: number; side: 'before' | 'after' } | null = null;
+    let bestDist = Infinity;
+
+    items.forEach((el) => {
+      const row = el as HTMLElement;
+      const id = Number(row.dataset['id']);
+      if (!id || id === draggedId) return;
+
+      const rect = row.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const dist = Math.abs(y - midY);
+
+      if (dist < bestDist && y >= rect.top - 10 && y <= rect.bottom + 10) {
+        bestDist = dist;
+        best = { id, side: y < midY ? 'before' : 'after' };
+      }
+    });
+
+    // Fallback: if no row found, return first visible item
+    if (!best) {
+      const first = this.todos()[0];
+      return { id: first.id, side: 'before' };
+    }
+    return best;
   }
 
   /** Alt+ArrowUp/ArrowDown on a row's handle: move it one visible slot. */
