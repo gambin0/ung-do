@@ -2,6 +2,7 @@ import { Component, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Todo } from './todo';
+import { isOverdue, isUpcoming, formatDueDate, formatAgo } from './time-utils';
 
 /** A single to-do row: drag handle, animated completion toggle, title (inline-editable), delete. */
 @Component({
@@ -61,11 +62,24 @@ import { Todo } from './todo';
         <button
           type="button"
           class="title"
+          [class.is-overdue]="isOverdue(todo())"
           (click)="startEdit()"
           [title]="'Edit ' + todo().title"
         >
           {{ todo().title }}
         </button>
+      }
+
+      @if (todo().dueAt) {
+        <span
+          class="due-badge"
+          [class.is-overdue]="isOverdue(todo())"
+          [class.is-upcoming]="isUpcoming(todo())"
+          [title]="todo().dueAt"
+        >
+          <mat-icon>{{ isOverdue(todo()) ? 'warning' : 'schedule' }}</mat-icon>
+          {{ isOverdue(todo()) ? formatAgo(todo().dueAt!) : formatDueDate(todo().dueAt!) }}
+        </span>
       }
 
       <button
@@ -108,6 +122,12 @@ export class TodoItem {
   /** True once the user presses the handle, so only armed rows are draggable. */
   protected readonly armed = signal(false);
   protected readonly dragging = signal(false);
+
+  /** Expose time-utils functions to the template. */
+  protected isOverdue = isOverdue;
+  protected isUpcoming = isUpcoming;
+  protected formatDueDate = formatDueDate;
+  protected formatAgo = formatAgo;
 
   protected arm(): void {
     this.armed.set(true);

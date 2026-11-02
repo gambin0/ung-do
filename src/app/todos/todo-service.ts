@@ -65,12 +65,12 @@ export class TodoService {
     return data.todo;
   }
 
-  async add(title: string): Promise<void> {
-    await this.request('POST', '', { title });
+  async add(title: string, dueAt?: string | null): Promise<void> {
+    await this.request('POST', '', { title, dueAt });
     await this.load();
   }
 
-  async update(id: number, patch: { title?: string; completed?: boolean }): Promise<void> {
+  async update(id: number, patch: { title?: string; completed?: boolean; dueAt?: string | null }): Promise<void> {
     await this.request('PATCH', `/${id}`, patch);
     await this.load();
   }

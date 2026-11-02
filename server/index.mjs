@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, list, create, update, remove, reorder } from './db.mjs';
 
-const HOST = '127.0.0.1';
+const HOST = '0.0.0.0';
 const PORT = Number(process.env.PORT || 3000);
 const DB_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'ung-do.db');
 
@@ -56,7 +56,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && id === null) {
       const body = await readBody(req);
-      const todo = create(db, body.title);
+      const todo = create(db, body.title, body.dueAt);
       if (!todo) return sendJson(res, 400, { error: 'title is required' });
       return sendJson(res, 201, { todo });
     }

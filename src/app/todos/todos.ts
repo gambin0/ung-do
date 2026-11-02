@@ -1,8 +1,9 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { TodoItem } from './todo-item';
 import { TodoService } from './todo-service';
+import { NotificationService } from './notification-service';
 import { applyVisibleOrder } from './order';
 import { Filter, Todo } from './todo';
 
@@ -63,6 +64,14 @@ const FILTERS: { key: Filter; label: string }[] = [
               aria-label="New to-do title"
               [ngModel]="draft()"
               (ngModelChange)="draft.set($event)"
+            />
+            <input
+              type="datetime-local"
+              name="new-due"
+              class="composer-due"
+              aria-label="Due date and time (optional)"
+              [ngModel]="dueDate()"
+              (ngModelChange)="dueDate.set($event)"
             />
             <button
               type="submit"
@@ -161,6 +170,7 @@ export class Todos implements OnInit {
 
   protected readonly draft = signal('');
   protected readonly busy = signal(false);
+  protected readonly dueDate = signal('');
 
   protected readonly todos = computed(() => this.service.todos());
   protected readonly counts = computed(() => this.service.counts());
@@ -180,7 +190,12 @@ export class Todos implements OnInit {
 
   protected readonly dateLabel = signal('');
 
-  constructor(protected readonly service: TodoService) {}
+  private checkInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    protected readonly service: TodoService,
+    private readonly notifications: NotificationService,
+  ) {}
 
   ngOnInit(): void {
     this.dateLabel.set(
@@ -191,6 +206,24 @@ export class Todos implements OnInit {
       }),
     );
     this.service.load();
+    this.startPeriodicChecks();
+  }
+
+  ngOnDestroy(): void {
+    this.stopPeriodicChecks();
+  }
+
+  private startPeriodicChecks(): void {
+    this.checkInterval = setInterval(() => {
+      this.notifications.checkDueTodos(this.service.allTodos());
+    }, 60000); // every 60 seconds
+  }
+
+  private stopPeriodicChecks(): void {
+    if (this.checkInterval !== null) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
   }
 
   protected emptyGlyph(): string {
@@ -232,8 +265,13 @@ export class Todos implements OnInit {
     if (!title) return; // blank/whitespace-only input is rejected
     this.busy.set(true);
     try {
-      await this.service.add(title);
+      const dueAt = this.dueDate().trim() ? this.dueDate().trim() : null;
+      if (dueAt) {
+        await this.notifications.requestPermission();
+      }
+      await this.service.add(title, dueAt);
       this.draft.set('');
+      this.dueDate.set('');
     } finally {
       this.busy.set(false);
     }

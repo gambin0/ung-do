@@ -23,6 +23,7 @@ export function openDb(filePath) {
     );
   `);
   migratePos(db);
+  migrateDueAt(db);
   return db;
 }
 
@@ -46,12 +47,31 @@ function migratePos(db) {
   }
 }
 
+/**
+ * Idempotent migration: databases created before `due_at` existed get the column
+ * added (nullable TEXT, ISO 8601 timestamps). No backfill needed — existing todos
+ * have no due date.
+ */
+function migrateDueAt(db) {
+  const hasDueAt = db.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('todos') WHERE name = 'due_at'").get().n > 0;
+  if (hasDueAt) return;
+  db.exec('BEGIN');
+  try {
+    db.exec('ALTER TABLE todos ADD COLUMN due_at TEXT');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 function rowToTodo(row) {
   return {
     id: row.id,
     title: row.title,
     completed: !!row.completed,
     createdAt: row.created_at,
+    dueAt: row.due_at,
   };
 }
 
@@ -69,20 +89,20 @@ export function list(db, status = 'all') {
 }
 
 /** Create a todo from a trimmed title. Inserts at the top of the list. Returns null if the title is blank. */
-export function create(db, title) {
+export function create(db, title, dueAt = null) {
   const t = String(title ?? '').trim();
   if (!t) return null;
   const pos = (db.prepare('SELECT COALESCE(MIN(pos), 1) AS p FROM todos').get().p) - 1;
-  const info = db.prepare('INSERT INTO todos (title, pos) VALUES (?, ?)').run(t, pos);
+  const info = db.prepare('INSERT INTO todos (title, pos, due_at) VALUES (?, ?, ?)').run(t, pos, dueAt);
   const row = db.prepare('SELECT * FROM todos WHERE id = ?').get(info.lastInsertRowid);
   return rowToTodo(row);
 }
 
 /**
- * Update title and/or completed for an existing todo.
+ * Update title, completed, and/or dueAt for an existing todo.
  * A blank title is rejected (existing title retained). Returns null if not found.
  */
-export function update(db, id, { title, completed } = {}) {
+export function update(db, id, { title, completed, dueAt } = {}) {
   const existing = db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   if (!existing) return null;
 
@@ -95,7 +115,10 @@ export function update(db, id, { title, completed } = {}) {
   let newCompleted = existing.completed;
   if (completed !== undefined) newCompleted = completed ? 1 : 0;
 
-  db.prepare('UPDATE todos SET title = ?, completed = ? WHERE id = ?').run(newTitle, newCompleted, id);
+  let newDueAt = existing.due_at;
+  if (dueAt !== undefined) newDueAt = dueAt;
+
+  db.prepare('UPDATE todos SET title = ?, completed = ?, due_at = ? WHERE id = ?').run(newTitle, newCompleted, newDueAt, id);
   const row = db.prepare('SELECT * FROM todos WHERE id = ?').get(id);
   return rowToTodo(row);
 }

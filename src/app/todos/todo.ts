@@ -5,6 +5,8 @@ export interface Todo {
   completed: boolean;
   /** ISO-8601 timestamp from the server. */
   createdAt: string;
+  /** ISO-8601 timestamp for due date, or null. */
+  dueAt?: string | null;
 }
 
 /** Display filters supported by both the UI and the API. */

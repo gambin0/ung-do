@@ -264,6 +264,22 @@
   color: var(--ink-400);
   font-weight: 400;
 }
+.composer-due {
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-600);
+  padding: 0.4rem 0;
+  cursor: pointer;
+}
+.composer-due::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
 
 /* ---- Progress ---------------------------------------------------------- */
 .progress {

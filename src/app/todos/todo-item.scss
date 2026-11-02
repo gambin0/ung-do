@@ -165,6 +165,13 @@
 .title:hover {
   color: var(--brand-600);
 }
+.title.is-overdue {
+  color: #ef4444;
+  font-weight: 600;
+}
+.title.is-overdue:hover {
+  color: #dc2626;
+}
 .item.is-completed .title {
   color: var(--ink-400);
   text-decoration: line-through;
@@ -173,6 +180,30 @@
 }
 .item.is-completed .title:hover {
   color: var(--ink-400);
+}
+
+/* ---- Due date badge ---------------------------------------------------- */
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.due-badge .material-symbols-outlined {
+  font-size: 14px;
+}
+.due-badge.is-upcoming {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+.due-badge.is-overdue {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 
 /* ---- Inline editor ----------------------------------------------------- */
