@@ -249,13 +249,33 @@
   transform: scale(0.96);
 }
 
-/* ---- Due date editor --------------------------------------------------- */
-.editor-due {
-  display: flex;
+/* Due date button in editor */
+.editor-due-btn {
+  display: none;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
   flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
 }
+.editor-due-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-600);
+}
+.editor-due-btn.has-due {
+  color: var(--brand-600);
+}
+.editor-due-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* ---- Due date editor --------------------------------------------------- */
 .editor-due-input {
   font-family: inherit;
   font-size: 0.8rem;
@@ -266,30 +286,24 @@
   outline: none;
   background: #f8fafc;
   transition: border-color 0.18s ease;
+  flex-shrink: 0;
 }
 .editor-due-input:focus {
   border-color: var(--brand-500);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
-.editor-due-clear {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-400);
-  cursor: pointer;
-  transition: color 0.18s ease, background 0.18s ease;
-}
-.editor-due-clear .material-symbols-outlined {
-  font-size: 14px;
-}
-.editor-due-clear:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+
+@media (max-width: 600px) {
+  .editor-due-input {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .editor-due-btn {
+    display: inline-flex;
+  }
 }
 
 /* ---- Actions ----------------------------------------------------------- */

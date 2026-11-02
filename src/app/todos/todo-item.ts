@@ -62,26 +62,24 @@ function toDatetimeLocal(iso: string): string {
             (ngModelChange)="draft.set($event)"
             aria-label="Edit title"
           />
-          <div class="editor-due">
-            <input
-              type="datetime-local"
-              name="edit-due"
-              class="editor-due-input"
-              [ngModel]="dueDraft()"
-              (ngModelChange)="dueDraft.set($event)"
-              aria-label="Edit due date and time"
-            />
-            @if (dueDraft()) {
-              <button
-                type="button"
-                class="editor-due-clear"
-                (click)="clearDue()"
-                aria-label="Clear due date"
-              >
-                <mat-icon>close</mat-icon>
-              </button>
-            }
-          </div>
+          <button
+            type="button"
+            class="editor-due-btn"
+            (click)="editDueInput.focus()"
+            [class.has-due]="dueDraft()"
+            aria-label="Set or clear due date"
+          >
+            <mat-icon>{{ dueDraft() ? 'event' : 'event' }}</mat-icon>
+          </button>
+          <input
+            #editDueInput
+            type="datetime-local"
+            name="edit-due"
+            class="editor-due-input"
+            [ngModel]="dueDraft()"
+            (ngModelChange)="dueDraft.set($event)"
+            aria-label="Edit due date and time"
+          />
           <button type="submit" class="editor-btn">Save</button>
         </form>
       } @else {
