@@ -41,7 +41,7 @@ function toDatetimeLocal(iso: string): string {
         type="button"
         class="check"
         [class.checked]="todo().completed"
-        (click)="toggle.emit(!todo().completed)"
+        (pointerup)="toggle.emit(!todo().completed)"
         [aria-pressed]="todo().completed"
         [aria-label]="'Mark ' + todo().title + ' ' + (todo().completed ? 'not done' : 'complete')"
       >
@@ -83,7 +83,7 @@ function toDatetimeLocal(iso: string): string {
           type="button"
           class="title"
           [class.is-overdue]="isOverdue(todo())"
-          (click)="startEdit()"
+          (pointerup)="startEdit()"
           [title]="'Edit ' + todo().title"
         >
           {{ todo().title }}
@@ -105,7 +105,7 @@ function toDatetimeLocal(iso: string): string {
       <button
         type="button"
         class="action delete"
-        (click)="remove.emit()"
+        (pointerup)="remove.emit()"
         [aria-label]="'Delete ' + todo().title"
       >
         <mat-icon>delete</mat-icon>
