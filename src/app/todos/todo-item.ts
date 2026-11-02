@@ -159,16 +159,22 @@ export class TodoItem {
   protected onPointerDown(event: PointerEvent): void {
     event.preventDefault();
     event.stopPropagation();
+
+    // Capture pointer to track movement on mobile
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+
     this.dragging.set(true);
-    this.dragStart.emit({ id: this.todo().id } as any);
+    this.dragStart.emit({ id: this.todo().id });
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-      this.dragOver.emit({ id: this.todo().id, y: moveEvent.clientY } as any);
+      this.dragOver.emit({ id: this.todo().id, y: moveEvent.clientY });
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
+      handle.releasePointerCapture(upEvent.pointerId);
       this.dragging.set(false);
-      this.dropped.emit({ id: this.todo().id, y: upEvent.clientY } as any);
+      this.dropped.emit({ id: this.todo().id, y: upEvent.clientY });
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
