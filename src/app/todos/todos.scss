@@ -264,6 +264,28 @@
   color: var(--ink-400);
   font-weight: 400;
 }
+.composer-due-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.composer-due-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-600);
+}
+.composer-due-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
 .composer-due {
   flex-shrink: 0;
   border: none;
@@ -279,6 +301,19 @@
 .composer-due::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+  .composer-due {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .composer-due-btn {
+    display: inline-flex;
+  }
 }
 
 /* ---- Progress ---------------------------------------------------------- */

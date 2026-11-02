@@ -65,13 +65,23 @@ const FILTERS: { key: Filter; label: string }[] = [
               [ngModel]="draft()"
               (ngModelChange)="draft.set($event)"
             />
+            <button
+              type="button"
+              class="composer-due-btn"
+              aria-label="Set due date and time (optional)"
+              (click)="dueInput.focus()"
+            >
+              <mat-icon>event</mat-icon>
+            </button>
             <input
+              #dueInput
               type="datetime-local"
               name="new-due"
               class="composer-due"
               aria-label="Due date and time (optional)"
               [ngModel]="dueDate()"
               (ngModelChange)="dueDate.set($event)"
+              (blur)="dueInput.blur()"
             />
             <button
               type="submit"
