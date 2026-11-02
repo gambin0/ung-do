@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ung Do</string>
+    <string name="title_activity_main">Ung Do</string>
+    <string name="package_name">com.ungdo.app</string>
+    <string name="custom_url_scheme">com.ungdo.app</string>
+</resources>

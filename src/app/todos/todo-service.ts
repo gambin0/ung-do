@@ -1,22 +1,19 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
 import { Filter, Todo } from './todo';
+import { firebaseConfig } from '../firebase.config';
 
-/**
- * Talks to the local to-do API (same-origin `/api`, proxied by the dev server).
- * Uses plain `fetch` — no HttpClient dependency. Keeps the full list and derives
- * the filtered view + counts client-side so filtering is instant.
- */
+let app = initializeApp(firebaseConfig);
+let db = getFirestore(app);
+
 @Injectable({ providedIn: 'root' })
 export class TodoService {
-  private readonly api = '/api/todos';
-
-  /** Full list from the server (always newest-first, unfiltered). */
   readonly allTodos = signal<Todo[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly filter = signal<Filter>('all');
 
-  /** The list for the current filter. */
   readonly todos = computed(() => {
     const f = this.filter();
     const all = this.allTodos();
@@ -34,15 +31,25 @@ export class TodoService {
     };
   });
 
-  /** Fetch the full list from the server. */
   async load(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const res = await fetch(`${this.api}?status=all`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { todos: Todo[] };
-      this.allTodos.set(data.todos);
+      const todosRef = collection(db, 'todos');
+      const q = query(todosRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const todos: Todo[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        todos.push({
+          id: parseInt(docSnap.id),
+          title: data['title'],
+          completed: data['completed'] || false,
+          createdAt: data['createdAt']?.toMillis ? data['createdAt'].toMillis() : Date.now(),
+          dueAt: data['dueAt']?.toMillis ? data['dueAt'].toMillis() : null,
+        });
+      });
+      this.allTodos.set(todos);
     } catch (e) {
       this.error.set((e as Error).message || 'failed to load to-dos');
     } finally {
@@ -50,29 +57,33 @@ export class TodoService {
     }
   }
 
-  private async request(method: string, path: string, body?: unknown): Promise<Todo | null> {
-    const res = await fetch(`${this.api}${path}`, {
-      method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(data?.error ?? `HTTP ${res.status}`);
-    }
-    if (res.status === 204) return null;
-    const data = (await res.json()) as { todo: Todo };
-    return data.todo;
-  }
-
   async add(title: string, dueAt?: string | null): Promise<void> {
-    await this.request('POST', '', { title, dueAt });
-    await this.load();
+    try {
+      const todosRef = collection(db, 'todos');
+      await addDoc(todosRef, {
+        title,
+        completed: false,
+        createdAt: Date.now(),
+        dueAt: dueAt ? new Date(dueAt) : null,
+      });
+      await this.load();
+    } catch (e) {
+      throw new Error((e as Error).message || 'failed to add todo');
+    }
   }
 
   async update(id: number, patch: { title?: string; completed?: boolean; dueAt?: string | null }): Promise<void> {
-    await this.request('PATCH', `/${id}`, patch);
-    await this.load();
+    try {
+      const todoRef = doc(db, 'todos', id.toString());
+      const updateData: any = {};
+      if (patch.title !== undefined) updateData.title = patch.title;
+      if (patch.completed !== undefined) updateData.completed = patch.completed;
+      if (patch.dueAt !== undefined) updateData.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
+      await updateDoc(todoRef, updateData);
+      await this.load();
+    } catch (e) {
+      throw new Error((e as Error).message || 'failed to update todo');
+    }
   }
 
   async toggle(id: number, completed: boolean): Promise<void> {
@@ -80,32 +91,26 @@ export class TodoService {
   }
 
   async remove(id: number): Promise<void> {
-    await this.request('DELETE', `/${id}`);
-    await this.load();
+    try {
+      const todoRef = doc(db, 'todos', id.toString());
+      await deleteDoc(todoRef);
+      await this.load();
+    } catch (e) {
+      throw new Error((e as Error).message || 'failed to delete todo');
+    }
   }
 
-  /** Change the active filter (view-only, no round-trip needed). */
   setFilter(filter: Filter): void {
     this.filter.set(filter);
   }
 
-  /**
-   * Reorder the full list (top first). Optimistically applies the new order,
-   * then persists it via `PUT /api/todos/order`. On failure the previous order
-   * is restored and the error signal is set.
-   */
   async reorder(newFullOrder: Todo[]): Promise<void> {
     const previous = this.allTodos();
     this.allTodos.set(newFullOrder);
     try {
-      const res = await fetch(`${this.api}/order`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: newFullOrder.map((t) => t.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      for (let i = 0; i < newFullOrder.length; i++) {
+        const todoRef = doc(db, 'todos', newFullOrder[i].id.toString());
+        await updateDoc(todoRef, { order: i });
       }
     } catch (e) {
       this.allTodos.set(previous);
