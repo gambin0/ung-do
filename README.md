@@ -6,6 +6,15 @@ on this machine. No cloud backend, no native build step.
 
 Generated with [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
 
+## Features
+
+- **Task management**: Create, edit, complete, and delete tasks
+- **Due dates & reminders**: Set due dates on tasks; get browser notifications when tasks are due
+- **Overdue tracking**: Tasks past their due date are highlighted in red with time-elapsed display
+- **Drag-and-drop reordering**: Rearrange tasks via mouse or keyboard (Alt+Arrow keys)
+- **Filtering**: View all, active, or completed tasks
+- **Persistent ordering**: Task order is saved and restored across sessions
+
 ## Running the app
 
 Install dependencies (once):

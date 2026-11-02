@@ -4,6 +4,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { Todo } from './todo';
 import { isOverdue, isUpcoming, formatDueDate, formatAgo } from './time-utils';
 
+/** Convert ISO-8601 to datetime-local input format (YYYY-MM-DDTHH:mm). */
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** A single to-do row: drag handle, animated completion toggle, title (inline-editable), delete. */
 @Component({
   selector: 'app-todo-item',
@@ -53,9 +60,28 @@ import { isOverdue, isUpcoming, formatDueDate, formatAgo } from './time-utils';
             class="editor-input"
             [ngModel]="draft()"
             (ngModelChange)="draft.set($event)"
-            (blur)="save()"
             aria-label="Edit title"
           />
+          <div class="editor-due">
+            <input
+              type="datetime-local"
+              name="edit-due"
+              class="editor-due-input"
+              [ngModel]="dueDraft()"
+              (ngModelChange)="dueDraft.set($event)"
+              aria-label="Edit due date and time"
+            />
+            @if (dueDraft()) {
+              <button
+                type="button"
+                class="editor-due-clear"
+                (click)="clearDue()"
+                aria-label="Clear due date"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
           <button type="submit" class="editor-btn">Save</button>
         </form>
       } @else {
@@ -100,8 +126,10 @@ export class TodoItem {
 
   /** Fired when the user toggles completion (emits the NEW desired state). */
   readonly toggle = output<boolean>();
-  /** Fired when the user saves an edited (non-blank) title. */
+  /** Fired when the user saves an edited title (or nothing if unchanged). */
   readonly update = output<string>();
+  /** Fired when the user changes the due date (null = cleared). */
+  readonly updateDue = output<string | null>();
   /** Fired when the user deletes the row. */
   readonly remove = output<void>();
   /** Fired when a drag begins on this row. */
@@ -119,6 +147,7 @@ export class TodoItem {
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
+  protected readonly dueDraft = signal('');
   /** True once the user presses the handle, so only armed rows are draggable. */
   protected readonly armed = signal(false);
   protected readonly dragging = signal(false);
@@ -131,6 +160,10 @@ export class TodoItem {
 
   protected arm(): void {
     this.armed.set(true);
+  }
+
+  protected clearDue(): void {
+    this.dueDraft.set('');
   }
 
   protected onDragStart(event: DragEvent): void {
@@ -155,16 +188,23 @@ export class TodoItem {
 
   protected startEdit(): void {
     this.draft.set(this.todo().title);
+    const due = this.todo().dueAt;
+    this.dueDraft.set(due ? toDatetimeLocal(due) : '');
     this.editing.set(true);
   }
 
   protected save(): void {
     if (!this.editing()) return;
     const trimmed = this.draft().trim();
+    const due = this.todo().dueAt;
+    const originalDueStr = due ? toDatetimeLocal(due) : '';
+    const dueChanged = this.dueDraft().trim() !== originalDueStr;
     this.editing.set(false);
     if (trimmed && trimmed !== this.todo().title) {
-      // Blank edits are rejected: the row keeps its previous title.
       this.update.emit(trimmed);
+    }
+    if (dueChanged) {
+      this.updateDue.emit(this.dueDraft().trim() || null);
     }
   }
 }

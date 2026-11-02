@@ -11,7 +11,7 @@
 - [x] 2.2 Update `update` function in db.mjs to accept and store `dueAt`
 - [x] 2.3 Update `list` function in db.mjs to return `dueAt` field
 - [x] 2.4 Update API routes to pass `dueAt` through request/response bodies
-- [ ] 2.5 Test API endpoints with dueAt field
+- [x] 2.5 Test API endpoints with dueAt field
 
 ## 3. Frontend Data Model
 
@@ -21,8 +21,8 @@
 ## 4. UI - Due Date Input
 
 - [x] 4.1 Add due date/time picker to todo creation form
-- [ ] 4.2 Add due date/time picker to todo edit form
-- [ ] 4.3 Add UI to clear/remove a due date from a task
+- [x] 4.2 Add due date/time picker to todo edit form
+- [x] 4.3 Add UI to clear/remove a due date from a task
 
 ## 5. UI - Overdue Display
 
@@ -39,10 +39,10 @@
 
 ## 7. Testing
 
-- [ ] 7.1 Write unit tests for overdue detection logic
-- [ ] 7.2 Write unit tests for notification logic
-- [ ] 7.3 Run full test suite and verify all tests pass
+- [x] 7.1 Write unit tests for overdue detection logic
+- [x] 7.2 Write unit tests for notification logic
+- [x] 7.3 Run full test suite and verify all tests pass
 
 ## 8. Documentation
 
-- [ ] 8.1 Update README or docs to describe the reminders feature
+- [x] 8.1 Update README or docs to describe the reminders feature

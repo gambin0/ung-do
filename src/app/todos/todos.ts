@@ -139,6 +139,7 @@ const FILTERS: { key: Filter; label: string }[] = [
                       [todo]="t"
                       (toggle)="toggle(t.id, $event)"
                       (update)="updateTitle(t.id, $event)"
+                      (updateDue)="updateDue(t.id, $event)"
                       (remove)="remove(t.id)"
                       (dragStart)="onDragStart(t)"
                       (dragEnd)="onDragEnd()"
@@ -290,6 +291,20 @@ export class Todos implements OnInit {
     this.busy.set(true);
     try {
       await this.service.update(id, { title });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async updateDue(id: number, dueAt: string | null): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.service.update(id, { dueAt });
+      if (dueAt) {
+        await this.notifications.requestPermission();
+      } else {
+        this.notifications.forget(id);
+      }
     } finally {
       this.busy.set(false);
     }
