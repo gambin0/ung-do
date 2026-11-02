@@ -122,6 +122,31 @@
   backdrop-filter: blur(14px);
 }
 
+/* Saving overlay */
+.saving-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 22px;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+.saving-spinner {
+  font-size: 32px;
+  color: var(--brand-600);
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ---- Alert ------------------------------------------------------------- */
 .alert {
   display: flex;

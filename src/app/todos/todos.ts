@@ -43,7 +43,12 @@ const FILTERS: { key: Filter; label: string }[] = [
           }
         </header>
 
-        <section class="card">
+        <section class="card" [class.is-saving]="saving()">
+          @if (saving()) {
+            <div class="saving-overlay">
+              <mat-icon class="saving-spinner">sync</mat-icon>
+            </div>
+          }
           @if (error(); as err) {
             <div class="alert" role="alert">
               <mat-icon>cloud_off</mat-icon>
@@ -181,6 +186,7 @@ export class Todos implements OnInit {
 
   protected readonly draft = signal('');
   protected readonly busy = signal(false);
+  protected readonly saving = computed(() => this.service.saving());
   protected readonly dueDate = signal('');
 
   protected readonly todos = computed(() => this.service.todos());

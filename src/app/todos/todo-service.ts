@@ -11,6 +11,7 @@ let db = getFirestore(app);
 export class TodoService {
   readonly allTodos = signal<Todo[]>([]);
   readonly loading = signal(false);
+  readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly filter = signal<Filter>('all');
 
@@ -58,6 +59,7 @@ export class TodoService {
   }
 
   async add(title: string, dueAt?: string | null): Promise<void> {
+    this.saving.set(true);
     try {
       const todosRef = collection(db, 'todos');
       await addDoc(todosRef, {
@@ -69,10 +71,13 @@ export class TodoService {
       await this.load();
     } catch (e) {
       throw new Error((e as Error).message || 'failed to add todo');
+    } finally {
+      this.saving.set(false);
     }
   }
 
   async update(id: string, patch: { title?: string; completed?: boolean; dueAt?: string | null }): Promise<void> {
+    this.saving.set(true);
     try {
       const todoRef = doc(db, 'todos', id);
       const updateData: any = {};
@@ -83,6 +88,8 @@ export class TodoService {
       await this.load();
     } catch (e) {
       throw new Error((e as Error).message || 'failed to update todo');
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -91,12 +98,15 @@ export class TodoService {
   }
 
   async remove(id: string): Promise<void> {
+    this.saving.set(true);
     try {
       const todoRef = doc(db, 'todos', id);
       await deleteDoc(todoRef);
       await this.load();
     } catch (e) {
       throw new Error((e as Error).message || 'failed to delete todo');
+    } finally {
+      this.saving.set(false);
     }
   }
 
