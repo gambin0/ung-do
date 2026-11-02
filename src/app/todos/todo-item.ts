@@ -127,7 +127,7 @@ export class TodoItem {
   /** Fired when the user deletes the row. */
   readonly remove = output<void>();
   /** Fired when a drag begins on this row. */
-  readonly dragStart = output<{ id: number }>();
+  readonly dragStart = output<{ id: string }>();
   /** Fired when a drag started on this row ends (drop or cancel). */
   readonly dragEnd = output<void>();
   /** Fired by Alt+ArrowUp/ArrowDown on the handle: -1 = up, +1 = down. */
@@ -135,9 +135,9 @@ export class TodoItem {
   /** Where the drop indicator sits relative to this row, or null. */
   readonly dropSide = input<'before' | 'after' | null>(null);
   /** Pointer is hovering this row with a drag in flight. */
-  readonly dragOver = output<{ id: number; y: number }>();
+  readonly dragOver = output<{ id: string; y: number }>();
   /** The pointer was released over this row. */
-  readonly dropped = output<{ id: number; y: number }>();
+  readonly dropped = output<{ id: string; y: number }>();
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');

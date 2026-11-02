@@ -188,9 +188,9 @@ export class Todos implements OnInit {
   protected readonly error = computed(() => this.service.error());
 
   /** The to-do id currently being dragged, or null. */
-  protected readonly draggedId = signal<number | null>(null);
+  protected readonly draggedId = signal<string | null>(null);
   /** Where the drop indicator currently points, or null. */
-  protected readonly dropTarget = signal<{ id: number; side: 'before' | 'after' } | null>(null);
+  protected readonly dropTarget = signal<{ id: string; side: 'before' | 'after' } | null>(null);
   /** Screen-reader announcement for keyboard reordering. */
   protected readonly announce = signal('');
 
@@ -288,7 +288,7 @@ export class Todos implements OnInit {
     }
   }
 
-  protected async toggle(id: number, completed: boolean): Promise<void> {
+  protected async toggle(id: string, completed: boolean): Promise<void> {
     this.busy.set(true);
     try {
       await this.service.toggle(id, completed);
@@ -297,7 +297,7 @@ export class Todos implements OnInit {
     }
   }
 
-  protected async updateTitle(id: number, title: string): Promise<void> {
+  protected async updateTitle(id: string, title: string): Promise<void> {
     this.busy.set(true);
     try {
       await this.service.update(id, { title });
@@ -306,7 +306,7 @@ export class Todos implements OnInit {
     }
   }
 
-  protected async updateDue(id: number, dueAt: string | null): Promise<void> {
+  protected async updateDue(id: string, dueAt: string | null): Promise<void> {
     this.busy.set(true);
     try {
       await this.service.update(id, { dueAt });
@@ -320,7 +320,7 @@ export class Todos implements OnInit {
     }
   }
 
-  protected async remove(id: number): Promise<void> {
+  protected async remove(id: string): Promise<void> {
     this.busy.set(true);
     try {
       await this.service.remove(id);
@@ -346,18 +346,18 @@ export class Todos implements OnInit {
   // ---- Drag-to-reorder (pointer events for mobile + desktop) -------------
 
   /** Which indicator side (if any) to draw on a given row. */
-  protected dropSideFor(id: number): 'before' | 'after' | null {
+  protected dropSideFor(id: string): 'before' | 'after' | null {
     const t = this.dropTarget();
     if (!t || t.id !== id) return null;
     return t.side;
   }
 
-  protected onDragStart(event: { id: number }): void {
+  protected onDragStart(event: { id: string }): void {
     this.draggedId.set(event.id);
     this.dropTarget.set(null);
   }
 
-  protected onDragOver(event: { id: number; y: number }): void {
+  protected onDragOver(event: { id: string; y: number }): void {
     const dragged = this.draggedId();
     if (dragged === null) return;
 
@@ -369,7 +369,7 @@ export class Todos implements OnInit {
     }
   }
 
-  protected onDrop(event: { id: number; y: number }): void {
+  protected onDrop(event: { id: string; y: number }): void {
     const dragged = this.draggedId();
     this.draggedId.set(null);
     this.dropTarget.set(null);
@@ -403,14 +403,14 @@ export class Todos implements OnInit {
   }
 
   /** Find which row and side the pointer is over. */
-  private findDropTarget(y: number, draggedId: number): { id: number; side: 'before' | 'after' } {
+  private findDropTarget(y: number, draggedId: string): { id: string; side: 'before' | 'after' } {
     const items = document.querySelectorAll('.item');
-    let best: { id: number; side: 'before' | 'after' } | null = null;
+    let best: { id: string; side: 'before' | 'after' } | null = null;
     let bestDist = Infinity;
 
     items.forEach((el) => {
       const row = el as HTMLElement;
-      const id = Number(row.dataset['id']);
+      const id = row.dataset['id'];
       if (!id || id === draggedId) return;
 
       const rect = row.getBoundingClientRect();

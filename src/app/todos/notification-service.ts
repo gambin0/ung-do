@@ -12,7 +12,7 @@ export class NotificationService {
   readonly permission = signal<'default' | 'granted' | 'denied'>('default');
 
   /** IDs of todos we've already notified about (to avoid duplicates). */
-  private notifiedIds = new Set<number>();
+  private notifiedIds = new Set<string>();
 
   /**
    * Request notification permission from the browser.
@@ -73,7 +73,7 @@ export class NotificationService {
    * Forget a todo's notification status (e.g., after it's completed or its
    * due date is changed), so it can notify again later.
    */
-  forget(id: number): void {
+  forget(id: string): void {
     this.notifiedIds.delete(id);
   }
 

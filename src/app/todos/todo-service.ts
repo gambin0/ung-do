@@ -42,11 +42,11 @@ export class TodoService {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         todos.push({
-          id: parseInt(docSnap.id),
+          id: docSnap.id,
           title: data['title'],
           completed: data['completed'] || false,
-          createdAt: data['createdAt']?.toMillis ? data['createdAt'].toMillis() : Date.now(),
-          dueAt: data['dueAt']?.toMillis ? data['dueAt'].toMillis() : null,
+          createdAt: data['createdAt']?.toMillis ? new Date(data['createdAt'].toMillis()).toISOString() : new Date().toISOString(),
+          dueAt: data['dueAt']?.toMillis ? new Date(data['dueAt'].toMillis()).toISOString() : null,
         });
       });
       this.allTodos.set(todos);
@@ -72,9 +72,9 @@ export class TodoService {
     }
   }
 
-  async update(id: number, patch: { title?: string; completed?: boolean; dueAt?: string | null }): Promise<void> {
+  async update(id: string, patch: { title?: string; completed?: boolean; dueAt?: string | null }): Promise<void> {
     try {
-      const todoRef = doc(db, 'todos', id.toString());
+      const todoRef = doc(db, 'todos', id);
       const updateData: any = {};
       if (patch.title !== undefined) updateData.title = patch.title;
       if (patch.completed !== undefined) updateData.completed = patch.completed;
@@ -86,13 +86,13 @@ export class TodoService {
     }
   }
 
-  async toggle(id: number, completed: boolean): Promise<void> {
+  async toggle(id: string, completed: boolean): Promise<void> {
     await this.update(id, { completed });
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     try {
-      const todoRef = doc(db, 'todos', id.toString());
+      const todoRef = doc(db, 'todos', id);
       await deleteDoc(todoRef);
       await this.load();
     } catch (e) {

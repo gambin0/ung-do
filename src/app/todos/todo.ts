@@ -1,6 +1,6 @@
 /** A single to-do as returned by the local API. */
 export interface Todo {
-  id: number;
+  id: string;
   title: string;
   completed: boolean;
   /** ISO-8601 timestamp from the server. */
