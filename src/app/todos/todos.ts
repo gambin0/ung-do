@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, computed, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { TodoItem } from './todo-item';
@@ -20,7 +20,6 @@ const FILTERS: { key: Filter; label: string }[] = [
  */
 @Component({
   selector: 'app-todos',
-  standalone: true,
   imports: [FormsModule, MatIconModule, TodoItem],
   template: `
     <div class="page">
@@ -209,10 +208,8 @@ export class Todos implements OnInit {
 
   private checkInterval: ReturnType<typeof setInterval> | null = null;
 
-  constructor(
-    protected readonly service: TodoService,
-    private readonly notifications: NotificationService,
-  ) {}
+  protected readonly service = inject(TodoService);
+  private readonly notifications = inject(NotificationService);
 
   ngOnInit(): void {
     this.dateLabel.set(

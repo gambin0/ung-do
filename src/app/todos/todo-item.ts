@@ -14,7 +14,6 @@ function toDatetimeLocal(iso: string): string {
 /** A single to-do row: drag handle, animated completion toggle, title (inline-editable), delete. */
 @Component({
   selector: 'app-todo-item',
-  standalone: true,
   imports: [FormsModule, MatIconModule],
   template: `
     <div
@@ -24,92 +23,93 @@ function toDatetimeLocal(iso: string): string {
       [class.is-dragging]="dragging()"
       [class.drop-before]="dropSide() === 'before'"
       [class.drop-after]="dropSide() === 'after'"
+      [class.is-overdue]="isOverdue(todo())"
       role="listitem"
     >
-      <button
-        type="button"
-        class="handle"
-        (pointerdown)="onPointerDown($event)"
-        (keydown.alt.arrowup)="move.emit(-1)"
-        (keydown.alt.arrowdown)="move.emit(1)"
-        [aria-label]="'Reorder ' + todo().title + '. Press Alt and the arrow keys to move.'"
-      >
-        <mat-icon>drag_indicator</mat-icon>
-      </button>
-
-      <button
-        type="button"
-        class="check"
-        [class.checked]="todo().completed"
-        (pointerup)="toggle.emit(!todo().completed)"
-        [aria-pressed]="todo().completed"
-        [aria-label]="'Mark ' + todo().title + ' ' + (todo().completed ? 'not done' : 'complete')"
-      >
-        <mat-icon>check</mat-icon>
-      </button>
-
-      @if (editing()) {
-        <form class="editor" (ngSubmit)="save()">
-          <input
-            #edit
-            name="edit-title"
-            class="editor-input"
-            [ngModel]="draft()"
-            (ngModelChange)="draft.set($event)"
-            aria-label="Edit title"
-          />
-          <button
-            type="button"
-            class="editor-due-btn"
-            (click)="editDueInput.showPicker()"
-            [class.has-due]="dueDraft()"
-            aria-label="Set or clear due date"
-          >
-            <mat-icon>{{ dueDraft() ? 'event' : 'event' }}</mat-icon>
-          </button>
-          <input
-            #editDueInput
-            type="datetime-local"
-            name="edit-due"
-            class="editor-due-input"
-            [ngModel]="dueDraft()"
-            (ngModelChange)="dueDraft.set($event)"
-            aria-label="Edit due date and time"
-          />
-          <button type="submit" class="editor-btn">Save</button>
-        </form>
-      } @else {
+      <div class="item-main">
         <button
           type="button"
-          class="title"
-          [class.is-overdue]="isOverdue(todo())"
-          (pointerup)="startEdit()"
-          [title]="'Edit ' + todo().title"
+          class="handle"
+          (pointerdown)="onPointerDown($event)"
+          (keydown.alt.arrowup)="move.emit(-1)"
+          (keydown.alt.arrowdown)="move.emit(1)"
+          [aria-label]="'Reorder ' + todo().title + '. Press Alt and the arrow keys to move.'"
         >
-          {{ todo().title }}
+          <mat-icon>drag_indicator</mat-icon>
         </button>
-      }
+
+        <input
+          type="checkbox"
+          class="check"
+          [checked]="todo().completed"
+          (change)="toggle.emit(!todo().completed)"
+          [aria-label]="'Mark ' + todo().title + ' ' + (todo().completed ? 'not done' : 'complete')"
+        />
+
+        @if (editing()) {
+          <form class="editor" (ngSubmit)="save()">
+            <input
+              #edit
+              name="edit-title"
+              class="editor-input"
+              [ngModel]="draft()"
+              (ngModelChange)="draft.set($event)"
+              aria-label="Edit title"
+            />
+            <button
+              type="button"
+              class="editor-due-btn"
+              (click)="editDueInput.showPicker()"
+              [class.has-due]="dueDraft()"
+              aria-label="Set or clear due date"
+            >
+              <mat-icon>{{ dueDraft() ? 'event' : 'event' }}</mat-icon>
+            </button>
+            <input
+              #editDueInput
+              type="datetime-local"
+              name="edit-due"
+              class="editor-due-input"
+              [ngModel]="dueDraft()"
+              (ngModelChange)="dueDraft.set($event)"
+              aria-label="Edit due date and time"
+            />
+            <button type="submit" class="editor-btn">Save</button>
+          </form>
+        } @else {
+          <button
+            type="button"
+            class="title"
+            (pointerup)="startEdit()"
+            [title]="'Edit ' + todo().title"
+          >
+            {{ todo().title }}
+          </button>
+        }
+
+        <button
+          type="button"
+          class="action delete"
+          (pointerup)="remove.emit()"
+          [aria-label]="'Delete ' + todo().title"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
 
       @if (todo().dueAt) {
-        <span
-          class="due-badge"
-          [class.is-overdue]="isOverdue(todo())"
-          [class.is-upcoming]="isUpcoming(todo())"
-          [title]="todo().dueAt"
-        >
-          <mat-icon>{{ isOverdue(todo()) ? 'warning' : 'schedule' }}</mat-icon>
-          {{ isOverdue(todo()) ? formatAgo(todo().dueAt!) : formatDueDate(todo().dueAt!) }}
-        </span>
+        <div class="item-footer">
+          <span
+            class="due-badge"
+            [class.is-overdue]="isOverdue(todo())"
+            [class.is-upcoming]="isUpcoming(todo())"
+            [title]="todo().dueAt"
+          >
+            <mat-icon>{{ isOverdue(todo()) ? 'warning' : 'schedule' }}</mat-icon>
+            {{ isOverdue(todo()) ? formatAgo(todo().dueAt!) : formatDueDate(todo().dueAt!) }}
+          </span>
+        </div>
       }
-
-      <button
-        type="button"
-        class="action delete"
-        (pointerup)="remove.emit()"
-        [aria-label]="'Delete ' + todo().title"
-      >
-        <mat-icon>delete</mat-icon>
-      </button>
     </div>
   `,
   styleUrl: './todo-item.scss',

@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import { Todo } from './todo';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -25,7 +25,7 @@ function todoIdToNotificationId(todoId: string): number {
  * Uses Capacitor Local Notifications on Android/iOS (works in background).
  * Falls back to browser Notification API on web.
  */
-@Injectable({ providedIn: 'root' })
+@Service({ autoProvided: true })
 export class NotificationService {
   /** Whether the user has granted notification permission. */
   readonly permission = signal<'default' | 'granted' | 'denied'>('default');

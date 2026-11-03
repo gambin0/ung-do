@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Service, computed, signal } from '@angular/core';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
 import { Filter, Todo } from './todo';
@@ -7,7 +7,7 @@ import { firebaseConfig } from '../firebase.config';
 let app = initializeApp(firebaseConfig);
 let db = getFirestore(app);
 
-@Injectable({ providedIn: 'root' })
+@Service({ autoProvided: true })
 export class TodoService {
   readonly allTodos = signal<Todo[]>([]);
   readonly loading = signal(false);
@@ -80,7 +80,7 @@ export class TodoService {
     this.saving.set(true);
     try {
       const todoRef = doc(db, 'todos', id);
-      const updateData: any = {};
+      const updateData: { title?: string; completed?: boolean; dueAt?: Date | null } = {};
       if (patch.title !== undefined) updateData.title = patch.title;
       if (patch.completed !== undefined) updateData.completed = patch.completed;
       if (patch.dueAt !== undefined) updateData.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
