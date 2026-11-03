@@ -1,8 +1,7 @@
 # UngDo
 
 A modern single-user to-do app. Angular 22 frontend (Tailwind CSS v4 + Angular Material) backed
-by a tiny local API server (Node + built-in `node:sqlite`) that stores to-dos in a SQLite file
-on this machine. No cloud backend, no native build step.
+by Firebase Firestore for persistent storage. Available on web and Android.
 
 Generated with [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
 
@@ -23,48 +22,18 @@ Install dependencies (once):
 npm install
 ```
 
-Start everything with one command — this runs the API (port 3000) and the Angular dev server
-(port 4200, with the `/api` proxy) together:
+Start the development server:
 
 ```bash
-npm run dev
+npm start
 ```
 
-Then open <http://localhost:4200/> (or, from another tailnet device,
-<http://100.107.141.28:4200/> / <https://charles-ms-7e26.tail754593.ts.net/>).
+Then open <http://localhost:4200/>.
 
-The individual pieces, if you want to run them separately:
+### Data storage
 
-```bash
-npm run api      # just the to-do API on http://127.0.0.1:3000
-npm start        # just ng serve (API must already be running)
-```
-
-### Where the data lives
-
-To-dos are stored in **`server/data/ung-do.db`** (SQLite, WAL mode). The file and its
-`-wal`/`-shm` sidecars are created automatically on first use and are gitignored — your local
-to-dos never end up in git.
-
-To **reset** the app's data, stop the app and delete the directory:
-
-```bash
-rm -rf server/data/
-```
-
-The next start recreates an empty database.
-
-### How it fits together
-
-```
-browser ──> ng serve :4200 ──(dev-server proxy /api)──> node API :3000 ──> node:sqlite
-                                                                              (server/data/ung-do.db)
-```
-
-- `server/db.mjs` — the only code that opens the database (schema + CRUD).
-- `server/index.mjs` — a dependency-free `node:http` API (`GET/POST /api/todos`,
-  `PATCH/DELETE /api/todos/:id`, `?status=all|active|completed`), bound to loopback only.
-- `src/app/todos/` — the Angular UI (signals-based `TodoService` + standalone components).
+To-dos are stored in **Firebase Firestore**, providing persistent cloud storage that syncs
+across devices. No local database files are used.
 
 ## Development server
 

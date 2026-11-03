@@ -67,8 +67,7 @@
               "buildTarget": "ung-do:build:production"
             },
             "development": {
-              "buildTarget": "ung-do:build:development",
-              "proxyConfig": "proxy.conf.json"
+              "buildTarget": "ung-do:build:development"
             }
           },
           "defaultConfiguration": "development"
