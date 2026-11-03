@@ -61,7 +61,7 @@ function toDatetimeLocal(iso: string): string {
           <button
             type="button"
             class="editor-due-btn"
-            (click)="editDueInput.focus()"
+            (click)="editDueInput.showPicker()"
             [class.has-due]="dueDraft()"
             aria-label="Set or clear due date"
           >

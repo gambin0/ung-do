@@ -68,6 +68,24 @@ persist immediately.
 - **WHEN** the user activates the delete control on a to-do
 - **THEN** that to-do is removed from the list and no longer exists
 
+### Requirement: Set a due date on a to-do
+The system SHALL let the user set an optional due date and time when creating or editing a
+to-do. The due date MUST be persisted with the to-do and displayed in the UI. Setting a due
+date MUST trigger notification permission requests and schedule a reminder (see the
+todo-reminders capability).
+
+#### Scenario: Set due date when creating
+- **WHEN** the user enters a title, selects a due date/time, and submits
+- **THEN** the new to-do is created with that due date, persisted
+
+#### Scenario: Set due date when editing
+- **WHEN** the user opens a to-do's edit mode and sets or changes the due date
+- **THEN** the to-do's due date is updated and persisted
+
+#### Scenario: Clear due date
+- **WHEN** the user removes the due date from an existing to-do
+- **THEN** the to-do is persisted with no due date and any scheduled reminder is canceled
+
 ### Requirement: Filter to-dos by status
 The system SHALL let the user filter the list to show All, Active (not completed), or
 Completed to-dos. The filter MUST apply only to display, not to persistence, and the default

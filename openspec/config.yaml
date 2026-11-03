@@ -6,10 +6,14 @@ context: |
   Tech stack: Angular 22 (standalone components + signals, no NgModules), TypeScript 5.9+
   Styling: Tailwind CSS v4 (via @tailwindcss/postcss) + Angular Material 22 (Material 3)
   Build: @angular/build:application (esbuild). Dev: `ng serve --host 0.0.0.0 --port 4200`
+  Backend: Firebase Firestore (cloud persistence, no local SQLite)
+  Mobile: Capacitor wrapper for Android/iOS (capacitor.config.ts, android/ directory)
+  Notifications: Capacitor Local Notifications on mobile, browser Notification API on web
   Conventions:
     - Prefer Tailwind utilities for layout/spacing; reserve Angular Material for complex controls
     - Material theme lives in src/styles.scss via mat.theme() (azure primary / blue tertiary)
     - Use signals and standalone components; keep components feature-scoped
+    - Platform detection via Capacitor.getPlatform() for mobile vs web behavior
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

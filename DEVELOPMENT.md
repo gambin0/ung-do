@@ -43,6 +43,10 @@ npm run cap:sync
 npm run cap:run
 ```
 
+### Debugging & Deployment
+
+For detailed ADB commands, wireless debugging setup, and troubleshooting, see [docs/android-debugging.md](docs/android-debugging.md).
+
 ## Firebase Setup
 
 1. Create a Firebase project at https://console.firebase.google.com

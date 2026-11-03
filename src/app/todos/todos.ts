@@ -74,7 +74,7 @@ const FILTERS: { key: Filter; label: string }[] = [
               type="button"
               class="composer-due-btn"
               aria-label="Set due date and time (optional)"
-              (click)="dueInput.focus()"
+              (click)="dueInput.showPicker()"
             >
               <mat-icon>event</mat-icon>
             </button>
@@ -172,9 +172,9 @@ const FILTERS: { key: Filter; label: string }[] = [
         </section>
 
         <footer class="footnote">
-          <span>Stored locally in SQLite on this machine</span>
+          <span>Stored in Firebase Firestore</span>
           <span class="dot">•</span>
-          <span>no cloud, no sign-in</span>
+          <span>syncs across your devices</span>
         </footer>
       </div>
     </div>
@@ -286,7 +286,16 @@ export class Todos implements OnInit {
       if (dueAt) {
         await this.notifications.requestPermission();
       }
+      const todosBefore = this.service.allTodos().length;
       await this.service.add(title, dueAt);
+      // Schedule notification for the new todo (it's the first one after reload)
+      if (dueAt) {
+        const newTodos = this.service.allTodos();
+        if (newTodos.length > todosBefore) {
+          const newTodo = newTodos[0];
+          await this.notifications.scheduleTodoNotification(newTodo);
+        }
+      }
       this.draft.set('');
       this.dueDate.set('');
     } finally {
@@ -298,6 +307,13 @@ export class Todos implements OnInit {
     this.busy.set(true);
     try {
       await this.service.toggle(id, completed);
+      if (completed) {
+        // Cancel notification when todo is completed
+        const todo = this.service.allTodos().find((t) => t.id === id);
+        if (todo) {
+          await this.notifications.cancelTodoNotification(todo);
+        }
+      }
     } finally {
       this.busy.set(false);
     }
@@ -316,10 +332,14 @@ export class Todos implements OnInit {
     this.busy.set(true);
     try {
       await this.service.update(id, { dueAt });
-      if (dueAt) {
-        await this.notifications.requestPermission();
-      } else {
-        this.notifications.forget(id);
+      const todo = this.service.allTodos().find((t) => t.id === id);
+      if (todo) {
+        if (dueAt) {
+          await this.notifications.requestPermission();
+          await this.notifications.scheduleTodoNotification(todo);
+        } else {
+          await this.notifications.cancelTodoNotification(todo);
+        }
       }
     } finally {
       this.busy.set(false);
@@ -329,6 +349,10 @@ export class Todos implements OnInit {
   protected async remove(id: string): Promise<void> {
     this.busy.set(true);
     try {
+      const todo = this.service.allTodos().find((t) => t.id === id);
+      if (todo) {
+        await this.notifications.cancelTodoNotification(todo);
+      }
       await this.service.remove(id);
     } finally {
       this.busy.set(false);
