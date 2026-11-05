@@ -137,6 +137,34 @@ describe('TodoService', () => {
     fake.state.failCommit = true;
     expect(await svc.removeMany(['a'])).toBe(false);
     expect(svc.error()).toBe('bad order');
-    expect(svc.saving()).toBe(false);
+    expect(svc.pendingIds().size).toBe(0);
+  });
+
+  it('marks only the affected to-do as pending while it saves', async () => {
+    const svc = new TodoService();
+    await svc.load();
+
+    const write = svc.update('a', { completed: true });
+    expect([...svc.pendingIds()]).toEqual(['a']);
+    expect(svc.adding()).toBe(false);
+
+    // A second write to the same to-do while the first is in flight is skipped.
+    expect(await svc.remove('a')).toBe(false);
+
+    expect(await write).toBe(true);
+    expect(svc.pendingIds().size).toBe(0);
+    expect(ids(svc)).toContain('a');
+  });
+
+  it('flags adding (not any row) while a new to-do saves', async () => {
+    const svc = new TodoService();
+    await svc.load();
+
+    const write = svc.add('new');
+    expect(svc.adding()).toBe(true);
+    expect(svc.pendingIds().size).toBe(0);
+
+    await write;
+    expect(svc.adding()).toBe(false);
   });
 });

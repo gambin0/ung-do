@@ -33,7 +33,11 @@ function toDatetimeLocal(iso: string): string {
       [class.drop-before]="dropSide() === 'before'"
       [class.drop-after]="dropSide() === 'after'"
       [class.is-overdue]="isOverdue(todo())"
+      [attr.aria-busy]="busy()"
     >
+      @if (busy()) {
+        <div class="busy-overlay" aria-hidden="true"><mat-icon>sync</mat-icon></div>
+      }
       <div class="item-main">
         <button
           type="button"
@@ -135,6 +139,8 @@ export class TodoItem {
   readonly todo = input.required<Todo>();
   /** Where the drop indicator sits relative to this row, or null. */
   readonly dropSide = input<'before' | 'after' | null>(null);
+  /** Shows a spinner over just this row while its change is being saved. */
+  readonly busy = input(false);
 
   /** Fired when the user toggles completion (emits the NEW desired state). */
   readonly toggle = output<boolean>();

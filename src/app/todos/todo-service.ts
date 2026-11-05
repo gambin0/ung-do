@@ -57,7 +57,10 @@ function errorMessage(e: unknown, fallback: string): string {
 export class TodoService {
   readonly allTodos = signal<Todo[]>([]);
   readonly loading = signal(false);
-  readonly saving = signal(false);
+  /** True while a new to-do is being written. */
+  readonly adding = signal(false);
+  /** IDs of to-dos with a write in flight. */
+  readonly pendingIds = signal<ReadonlySet<string>>(new Set());
   readonly error = signal<string | null>(null);
   readonly filter = signal<Filter>('all');
 
@@ -94,6 +97,8 @@ export class TodoService {
       .map((t) => t.order)
       .filter((o) => o !== undefined);
     const order = orders.length ? Math.min(...orders) - 1 : undefined;
+    if (this.adding()) return null;
+    this.adding.set(true);
     const result = await this.mutate('Failed to add to-do', async () => {
       const ref = await addDoc(todosRef, {
         title,
@@ -104,6 +109,7 @@ export class TodoService {
       });
       return ref.id;
     });
+    this.adding.set(false);
     if (!result) return null;
     return this.allTodos().find((t) => t.id === result.value) ?? null;
   }
@@ -118,25 +124,33 @@ export class TodoService {
     if (patch.dueAt !== undefined) {
       data['dueAt'] = patch.dueAt ? Timestamp.fromDate(new Date(patch.dueAt)) : null;
     }
-    const result = await this.mutate('Failed to update to-do', () =>
-      updateDoc(doc(todosRef, id), data),
+    const result = await this.mutate(
+      'Failed to update to-do',
+      () => updateDoc(doc(todosRef, id), data),
+      [id],
     );
     return result !== null;
   }
 
   async remove(id: string): Promise<boolean> {
-    const result = await this.mutate('Failed to delete to-do', () => deleteDoc(doc(todosRef, id)));
+    const result = await this.mutate('Failed to delete to-do', () => deleteDoc(doc(todosRef, id)), [
+      id,
+    ]);
     return result !== null;
   }
 
   /** Deletes several to-dos in one atomic batch. */
   async removeMany(ids: readonly string[]): Promise<boolean> {
     if (ids.length === 0) return true;
-    const result = await this.mutate('Failed to delete to-dos', () => {
-      const batch = writeBatch(db);
-      for (const id of ids) batch.delete(doc(todosRef, id));
-      return batch.commit();
-    });
+    const result = await this.mutate(
+      'Failed to delete to-dos',
+      () => {
+        const batch = writeBatch(db);
+        for (const id of ids) batch.delete(doc(todosRef, id));
+        return batch.commit();
+      },
+      ids,
+    );
     return result !== null;
   }
 
@@ -168,10 +182,18 @@ export class TodoService {
 
   /**
    * Runs a write, reloads the list on success, and records failures in
-   * `error` instead of throwing. Returns the write's result, or null on failure.
+   * `error` instead of throwing. `ids` are marked pending until it settles;
+   * a write touching an already-pending to-do is skipped. Returns the write's
+   * result, or null on failure or skip.
    */
-  private async mutate<T>(fallback: string, write: () => Promise<T>): Promise<{ value: T } | null> {
-    this.saving.set(true);
+  private async mutate<T>(
+    fallback: string,
+    write: () => Promise<T>,
+    ids: readonly string[] = [],
+  ): Promise<{ value: T } | null> {
+    const pending = this.pendingIds();
+    if (ids.some((id) => pending.has(id))) return null;
+    this.setPending(ids, true);
     try {
       const value = await write();
       await this.load();
@@ -180,7 +202,19 @@ export class TodoService {
       this.error.set(errorMessage(e, fallback));
       return null;
     } finally {
-      this.saving.set(false);
+      this.setPending(ids, false);
     }
+  }
+
+  private setPending(ids: readonly string[], pending: boolean): void {
+    if (ids.length === 0) return;
+    this.pendingIds.update((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (pending) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
   }
 }

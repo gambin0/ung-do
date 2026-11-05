@@ -103,3 +103,34 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+// Spinner overlay that blocks just the element it sits in (the element needs
+// `position: relative`). Used for the composer and individual rows.
+.busy-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(1px);
+  cursor: progress;
+
+  .mat-icon {
+    color: var(--brand-600);
+    animation: busy-spin 1s linear infinite;
+  }
+}
+
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .busy-overlay .mat-icon {
+    animation-duration: 3s;
+  }
+}

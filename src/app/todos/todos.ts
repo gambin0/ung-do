@@ -59,12 +59,7 @@ type DropTarget = { id: string; side: 'before' | 'after' };
           }
         </header>
 
-        <section class="card" [class.is-saving]="saving()" [attr.aria-busy]="busy()">
-          @if (saving()) {
-            <div class="saving-overlay">
-              <mat-icon class="saving-spinner">sync</mat-icon>
-            </div>
-          }
+        <section class="card" [attr.aria-busy]="loading()">
           @if (error(); as err) {
             <div class="alert" role="alert">
               <mat-icon>cloud_off</mat-icon>
@@ -76,7 +71,10 @@ type DropTarget = { id: string; side: 'before' | 'after' };
             </div>
           }
 
-          <form class="composer" (ngSubmit)="add()">
+          <form class="composer" (ngSubmit)="add()" [attr.aria-busy]="adding()">
+            @if (adding()) {
+              <div class="busy-overlay" aria-hidden="true"><mat-icon>sync</mat-icon></div>
+            }
             <mat-icon class="composer-plus">add</mat-icon>
             <input
               name="new-title"
@@ -103,7 +101,7 @@ type DropTarget = { id: string; side: 'before' | 'after' };
               [ngModel]="dueDate()"
               (ngModelChange)="dueDate.set($event)"
             />
-            <button type="submit" class="btn btn-primary" [disabled]="busy() || !draft().trim()">
+            <button type="submit" class="btn btn-primary" [disabled]="!draft().trim()">
               <span>Add</span>
               <mat-icon>arrow_forward</mat-icon>
             </button>
@@ -158,6 +156,7 @@ type DropTarget = { id: string; side: 'before' | 'after' };
                   <li class="row-wrap" [style.--i]="i">
                     <app-todo-item
                       [todo]="t"
+                      [busy]="pendingIds().has(t.id)"
                       (toggle)="toggle(t.id, $event)"
                       (update)="updateTitle(t.id, $event)"
                       (updateDue)="updateDue(t.id, $event)"
@@ -202,8 +201,9 @@ export class Todos implements OnInit, OnDestroy {
   protected readonly counts = this.service.counts;
   protected readonly error = this.service.error;
   protected readonly filter = this.service.filter;
-  protected readonly saving = this.service.saving;
-  protected readonly busy = computed(() => this.service.saving() || this.service.loading());
+  protected readonly loading = this.service.loading;
+  protected readonly adding = this.service.adding;
+  protected readonly pendingIds = this.service.pendingIds;
 
   protected readonly draft = signal('');
   protected readonly dueDate = signal('');
@@ -256,7 +256,7 @@ export class Todos implements OnInit, OnDestroy {
 
   protected async add(): Promise<void> {
     const title = this.draft().trim();
-    if (!title) return;
+    if (!title || this.adding()) return;
     const dueAt = this.dueDate().trim() || null;
     if (dueAt) await this.notifications.requestPermission();
 

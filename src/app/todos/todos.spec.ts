@@ -21,7 +21,8 @@ function mockService(todos: Todo[], error: string | null = null) {
     filter,
     error: signal(error),
     loading: signal(false),
-    saving: signal(false),
+    adding: signal(false),
+    pendingIds: signal<ReadonlySet<string>>(new Set()),
     todos: computed(() => {
       const f = filter();
       if (f === 'active') return allTodos().filter((t) => !t.completed);
@@ -125,5 +126,32 @@ describe('Todos component', () => {
     expect(TestBed.inject(AuthService).signOut).toHaveBeenCalled();
     expect(service.clear).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith('/sign-in');
+  });
+
+  it('shows a spinner only on the row being saved', async () => {
+    const service = mockService(SAMPLE);
+    const { el, fixture } = await render(service);
+    service.pendingIds.set(new Set(['2']));
+    fixture.detectChanges();
+
+    const rows = [...el.querySelectorAll('app-todo-item .item')];
+    expect(rows.map((r) => r.querySelector('.busy-overlay') !== null)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(rows[1].getAttribute('aria-busy')).toBe('true');
+    expect(el.querySelector('.composer .busy-overlay')).toBeNull();
+  });
+
+  it('shows a spinner only on the composer while adding', async () => {
+    const service = mockService(SAMPLE);
+    const { el, fixture } = await render(service);
+    service.adding.set(true);
+    fixture.detectChanges();
+
+    expect(el.querySelector('.composer .busy-overlay')).not.toBeNull();
+    expect(el.querySelector('.composer')!.getAttribute('aria-busy')).toBe('true');
+    expect(el.querySelectorAll('app-todo-item .busy-overlay').length).toBe(0);
   });
 });
