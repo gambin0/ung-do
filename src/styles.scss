@@ -1,5 +1,5 @@
 @use '@angular/material' as mat;
-@import "tailwindcss";
+@import 'tailwindcss';
 
 // ---- Global tokens -------------------------------------------------------
 :root {
@@ -9,6 +9,7 @@
   --brand-700: #1d4ed8;
   --ink-900: #0f172a;
   --ink-600: #475569;
+  --ink-500: #64748b;
   --ink-400: #94a3b8;
   --ink-200: #e2e8f0;
   --surface: #ffffff;
@@ -40,15 +41,21 @@ body {
   color-scheme: light;
   margin: 0;
   height: 100%;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
     radial-gradient(1200px 600px at 80% -10%, rgba(59, 130, 246, 0.14), transparent 60%),
-    radial-gradient(900px 500px at 0% 0%, rgba(129, 140, 248, 0.12), transparent 55%),
-    var(--bg);
+    radial-gradient(900px 500px at 0% 0%, rgba(129, 140, 248, 0.12), transparent 55%), var(--bg);
   background-attachment: fixed;
   color: var(--ink-900);
 }
@@ -82,4 +89,17 @@ body {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+// Hide visually but keep available to screen readers.
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

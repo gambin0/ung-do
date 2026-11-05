@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only the owner's account may touch to-dos. Firebase lets anyone create an
+    // email/password account through the API, so being signed in is not enough:
+    // the UID must match. Find yours in Firebase console → Authentication → Users.
+    function isOwner() {
+      return request.auth != null && request.auth.uid == 'BySpb9bIe5XM0FFdwy0cIH4YbXC2';
+    }
+
+    function isValidTodo(data) {
+      return data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 1000
+        && data.completed is bool;
+    }
+
+    match /todos/{todoId} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && isValidTodo(request.resource.data);
+    }
+
+    // Everything else is denied by default.
+  }
+}

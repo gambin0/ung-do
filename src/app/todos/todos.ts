@@ -1,22 +1,39 @@
-import { Component, OnInit, OnDestroy, computed, signal, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { Router } from '@angular/router';
+import { AuthService } from '../auth/auth-service';
 import { TodoItem } from './todo-item';
 import { TodoService } from './todo-service';
 import { NotificationService } from './notification-service';
 import { applyVisibleOrder } from './order';
+import { isUpcoming } from './time-utils';
 import { Filter, Todo } from './todo';
 
-const FILTERS: { key: Filter; label: string }[] = [
+const FILTERS: readonly { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'active', label: 'Active' },
   { key: 'completed', label: 'Done' },
 ];
 
+const EMPTY_STATES: Record<Filter, { glyph: string; title: string; sub: string }> = {
+  all: { glyph: 'inbox', title: 'Nothing here yet', sub: 'Add a task above to get started.' },
+  active: { glyph: 'check_circle', title: 'All clear', sub: 'Every task is complete. Nice work.' },
+  completed: {
+    glyph: 'task_alt',
+    title: 'Nothing done yet',
+    sub: 'Check something off and it will land here.',
+  },
+};
+
+const DUE_CHECK_INTERVAL_MS = 60_000;
+
+type DropTarget = { id: string; side: 'before' | 'after' };
+
 /**
  * The to-do screen: a gradient header, an "add" composer, a progress bar,
- * a segmented All/Active/Done filter, and the list of items — plus empty-state
- * and backend-unavailable states.
+ * a segmented All/Active/Done filter, and the list of items — plus empty and
+ * error states.
  */
 @Component({
   selector: 'app-todos',
@@ -42,7 +59,7 @@ const FILTERS: { key: Filter; label: string }[] = [
           }
         </header>
 
-        <section class="card" [class.is-saving]="saving()">
+        <section class="card" [class.is-saving]="saving()" [attr.aria-busy]="busy()">
           @if (saving()) {
             <div class="saving-overlay">
               <mat-icon class="saving-spinner">sync</mat-icon>
@@ -53,7 +70,7 @@ const FILTERS: { key: Filter; label: string }[] = [
               <mat-icon>cloud_off</mat-icon>
               <div class="alert-body">
                 <strong>Backend unavailable</strong>
-                <span>{{ err }} — is <code>npm run api</code> running?</span>
+                <span>{{ err }}</span>
               </div>
               <button type="button" class="btn btn-ghost" (click)="load()">Retry</button>
             </div>
@@ -85,13 +102,8 @@ const FILTERS: { key: Filter; label: string }[] = [
               aria-label="Due date and time (optional)"
               [ngModel]="dueDate()"
               (ngModelChange)="dueDate.set($event)"
-              (blur)="dueInput.blur()"
             />
-            <button
-              type="submit"
-              class="btn btn-primary"
-              [disabled]="busy() || !draft().trim()"
-            >
+            <button type="submit" class="btn btn-primary" [disabled]="busy() || !draft().trim()">
               <span>Add</span>
               <mat-icon>arrow_forward</mat-icon>
             </button>
@@ -107,27 +119,22 @@ const FILTERS: { key: Filter; label: string }[] = [
           }
 
           <div class="toolbar">
-            <div class="segmented" role="tablist" aria-label="Filter to-dos">
+            <div class="segmented" role="group" aria-label="Filter to-dos">
               @for (f of FILTERS; track f.key) {
                 <button
                   type="button"
-                  role="tab"
                   class="segment"
-                  [class.is-active]="service.filter() === f.key"
-                  [aria-selected]="service.filter() === f.key"
+                  [class.is-active]="filter() === f.key"
+                  [aria-pressed]="filter() === f.key"
                   (click)="service.setFilter(f.key)"
                 >
                   {{ f.label }}
-                  <span class="segment-count">{{ countFor(f.key) }}</span>
+                  <span class="segment-count">{{ counts()[f.key] }}</span>
                 </button>
               }
             </div>
-            @if (counts().completed > 0 && service.filter() === 'all') {
-              <button
-                type="button"
-                class="btn btn-text"
-                (click)="clearCompleted()"
-              >
+            @if (counts().completed > 0 && filter() === 'all') {
+              <button type="button" class="btn btn-text" (click)="clearCompleted()">
                 <mat-icon>cleaning_services</mat-icon>
                 Clear done
               </button>
@@ -140,10 +147,10 @@ const FILTERS: { key: Filter; label: string }[] = [
             } @else if (todos().length === 0) {
               <div class="empty">
                 <div class="empty-glyph">
-                  <mat-icon>{{ emptyGlyph() }}</mat-icon>
+                  <mat-icon>{{ empty().glyph }}</mat-icon>
                 </div>
-                <p class="empty-title">{{ emptyTitle() }}</p>
-                <p class="empty-sub">{{ emptySub() }}</p>
+                <p class="empty-title">{{ empty().title }}</p>
+                <p class="empty-sub">{{ empty().sub }}</p>
               </div>
             } @else {
               <ul class="list">
@@ -174,42 +181,49 @@ const FILTERS: { key: Filter; label: string }[] = [
           <span>Stored in Firebase Firestore</span>
           <span class="dot">•</span>
           <span>syncs across your devices</span>
+          <span class="dot">•</span>
+          <button type="button" class="link-btn" (click)="signOut()">Sign out</button>
         </footer>
       </div>
     </div>
   `,
   styleUrl: './todos.scss',
 })
-export class Todos implements OnInit {
+export class Todos implements OnInit, OnDestroy {
+  protected readonly service = inject(TodoService);
+  private readonly notifications = inject(NotificationService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
   protected readonly FILTERS = FILTERS;
 
+  protected readonly todos = this.service.todos;
+  protected readonly counts = this.service.counts;
+  protected readonly error = this.service.error;
+  protected readonly filter = this.service.filter;
+  protected readonly saving = this.service.saving;
+  protected readonly busy = computed(() => this.service.saving() || this.service.loading());
+
   protected readonly draft = signal('');
-  protected readonly busy = signal(false);
-  protected readonly saving = computed(() => this.service.saving());
   protected readonly dueDate = signal('');
-
-  protected readonly todos = computed(() => this.service.todos());
-  protected readonly counts = computed(() => this.service.counts());
-  protected readonly error = computed(() => this.service.error());
-
-  /** The to-do id currently being dragged, or null. */
-  protected readonly draggedId = signal<string | null>(null);
-  /** Where the drop indicator currently points, or null. */
-  protected readonly dropTarget = signal<{ id: string; side: 'before' | 'after' } | null>(null);
-  /** Screen-reader announcement for keyboard reordering. */
-  protected readonly announce = signal('');
+  protected readonly dateLabel = signal('');
 
   protected readonly pct = computed(() => {
     const c = this.counts();
     return c.all === 0 ? 0 : Math.round((c.completed / c.all) * 100);
   });
 
-  protected readonly dateLabel = signal('');
+  protected readonly empty = computed(() => EMPTY_STATES[this.filter()]);
 
-  private checkInterval: ReturnType<typeof setInterval> | null = null;
+  /** The to-do id currently being dragged, or null. */
+  private readonly draggedId = signal<string | null>(null);
+  /** Where the drop indicator currently points, or null. */
+  private readonly dropTarget = signal<DropTarget | null>(null);
+  /** Screen-reader announcement for keyboard reordering. */
+  protected readonly announce = signal('');
 
-  protected readonly service = inject(TodoService);
-  private readonly notifications = inject(NotificationService);
+  private checkInterval: ReturnType<typeof setInterval> | undefined;
 
   ngOnInit(): void {
     this.dateLabel.set(
@@ -219,164 +233,92 @@ export class Todos implements OnInit {
         day: 'numeric',
       }),
     );
-    this.service.load();
-    this.startPeriodicChecks();
+    void this.service.load();
+    this.checkInterval = setInterval(
+      () => this.notifications.checkDueTodos(this.service.allTodos()),
+      DUE_CHECK_INTERVAL_MS,
+    );
   }
 
   ngOnDestroy(): void {
-    this.stopPeriodicChecks();
+    clearInterval(this.checkInterval);
   }
 
-  private startPeriodicChecks(): void {
-    this.checkInterval = setInterval(() => {
-      this.notifications.checkDueTodos(this.service.allTodos());
-    }, 60000); // every 60 seconds
+  protected async signOut(): Promise<void> {
+    await this.auth.signOut();
+    this.service.clear();
+    await this.router.navigateByUrl('/sign-in');
   }
 
-  private stopPeriodicChecks(): void {
-    if (this.checkInterval !== null) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-    }
-  }
-
-  protected emptyGlyph(): string {
-    const f = this.service.filter();
-    if (f === 'active') return 'check_circle';
-    if (f === 'completed') return 'task_alt';
-    return 'inbox';
-  }
-
-  protected emptyTitle(): string {
-    const f = this.service.filter();
-    if (f === 'active') return 'All clear';
-    if (f === 'completed') return 'Nothing done yet';
-    return 'Nothing here yet';
-  }
-
-  protected emptySub(): string {
-    const f = this.service.filter();
-    if (f === 'active') return 'Every task is complete. Nice work.';
-    if (f === 'completed') return 'Check something off and it will land here.';
-    return 'Add a task above to get started.';
-  }
-
-  protected countFor(key: Filter): number {
-    return this.counts()[key];
-  }
-
-  protected async load(): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.service.load();
-    } finally {
-      this.busy.set(false);
-    }
+  protected load(): Promise<void> {
+    return this.service.load();
   }
 
   protected async add(): Promise<void> {
     const title = this.draft().trim();
-    if (!title) return; // blank/whitespace-only input is rejected
-    this.busy.set(true);
-    try {
-      const dueAt = this.dueDate().trim() ? this.dueDate().trim() : null;
-      if (dueAt) {
-        await this.notifications.requestPermission();
-      }
-      const todosBefore = this.service.allTodos().length;
-      await this.service.add(title, dueAt);
-      // Schedule notification for the new todo (it's the first one after reload)
-      if (dueAt) {
-        const newTodos = this.service.allTodos();
-        if (newTodos.length > todosBefore) {
-          const newTodo = newTodos[0];
-          await this.notifications.scheduleTodoNotification(newTodo);
-        }
-      }
-      this.draft.set('');
-      this.dueDate.set('');
-    } finally {
-      this.busy.set(false);
-    }
+    if (!title) return;
+    const dueAt = this.dueDate().trim() || null;
+    if (dueAt) await this.notifications.requestPermission();
+
+    const todo = await this.service.add(title, dueAt);
+    if (!todo) return; // keep the draft so the user can retry
+    if (todo.dueAt) await this.notifications.scheduleTodoNotification(todo);
+    this.draft.set('');
+    this.dueDate.set('');
   }
 
   protected async toggle(id: string, completed: boolean): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.service.toggle(id, completed);
-      if (completed) {
-        // Cancel notification when todo is completed
-        const todo = this.service.allTodos().find((t) => t.id === id);
-        if (todo) {
-          await this.notifications.cancelTodoNotification(todo);
-        }
-      }
-    } finally {
-      this.busy.set(false);
+    if (!(await this.service.update(id, { completed }))) return;
+    const todo = this.findTodo(id);
+    if (!todo) return;
+    if (completed) {
+      await this.notifications.cancelTodoNotification(todo);
+    } else if (isUpcoming(todo)) {
+      await this.notifications.scheduleTodoNotification(todo);
     }
   }
 
   protected async updateTitle(id: string, title: string): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.service.update(id, { title });
-    } finally {
-      this.busy.set(false);
-    }
+    if (!(await this.service.update(id, { title }))) return;
+    // Refresh a pending reminder so it shows the new title.
+    const todo = this.findTodo(id);
+    if (todo && isUpcoming(todo)) await this.notifications.scheduleTodoNotification(todo);
   }
 
   protected async updateDue(id: string, dueAt: string | null): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.service.update(id, { dueAt });
-      const todo = this.service.allTodos().find((t) => t.id === id);
-      if (todo) {
-        if (dueAt) {
-          await this.notifications.requestPermission();
-          await this.notifications.scheduleTodoNotification(todo);
-        } else {
-          await this.notifications.cancelTodoNotification(todo);
-        }
-      }
-    } finally {
-      this.busy.set(false);
+    if (!(await this.service.update(id, { dueAt }))) return;
+    const todo = this.findTodo(id);
+    if (!todo) return;
+    if (dueAt) {
+      await this.notifications.requestPermission();
+      await this.notifications.scheduleTodoNotification(todo);
+    } else {
+      await this.notifications.cancelTodoNotification(todo);
     }
   }
 
   protected async remove(id: string): Promise<void> {
-    this.busy.set(true);
-    try {
-      const todo = this.service.allTodos().find((t) => t.id === id);
-      if (todo) {
-        await this.notifications.cancelTodoNotification(todo);
-      }
-      await this.service.remove(id);
-    } finally {
-      this.busy.set(false);
-    }
+    const todo = this.findTodo(id);
+    if (!todo || !(await this.service.remove(id))) return;
+    await this.notifications.cancelTodoNotification(todo);
   }
 
   protected async clearCompleted(): Promise<void> {
-    const completed = this.todos()
-      .filter((t) => t.completed)
-      .map((t) => t.id);
-    this.busy.set(true);
-    try {
-      for (const id of completed) {
-        await this.service.remove(id);
-      }
-    } finally {
-      this.busy.set(false);
-    }
+    const completed = this.service.allTodos().filter((t) => t.completed);
+    if (!(await this.service.removeMany(completed.map((t) => t.id)))) return;
+    await Promise.all(completed.map((t) => this.notifications.cancelTodoNotification(t)));
+  }
+
+  private findTodo(id: string): Todo | undefined {
+    return this.service.allTodos().find((t) => t.id === id);
   }
 
   // ---- Drag-to-reorder (pointer events for mobile + desktop) -------------
 
   /** Which indicator side (if any) to draw on a given row. */
-  protected dropSideFor(id: string): 'before' | 'after' | null {
+  protected dropSideFor(id: string): DropTarget['side'] | null {
     const t = this.dropTarget();
-    if (!t || t.id !== id) return null;
-    return t.side;
+    return t?.id === id ? t.side : null;
   }
 
   protected onDragStart(event: { id: string }): void {
@@ -384,25 +326,23 @@ export class Todos implements OnInit {
     this.dropTarget.set(null);
   }
 
-  protected onDragOver(event: { id: string; y: number }): void {
+  protected onDragOver(event: { y: number }): void {
     const dragged = this.draggedId();
     if (dragged === null) return;
-
-    // Find the row under the pointer
     const target = this.findDropTarget(event.y, dragged);
     const cur = this.dropTarget();
-    if (!cur || cur.id !== target.id || cur.side !== target.side) {
+    if (cur?.id !== target?.id || cur?.side !== target?.side) {
       this.dropTarget.set(target);
     }
   }
 
-  protected onDrop(event: { id: string; y: number }): void {
+  protected onDrop(event: { y: number }): void {
     const dragged = this.draggedId();
-    this.draggedId.set(null);
-    this.dropTarget.set(null);
+    this.onDragEnd();
     if (dragged === null) return;
 
     const target = this.findDropTarget(event.y, dragged);
+    if (!target) return;
     const visible = this.todos();
     const draggedTodo = visible.find((t) => t.id === dragged);
     if (!draggedTodo) return;
@@ -411,17 +351,12 @@ export class Todos implements OnInit {
     const hoveredIndex = without.findIndex((t) => t.id === target.id);
     if (hoveredIndex === -1) return;
     const insertAt = target.side === 'before' ? hoveredIndex : hoveredIndex + 1;
-    const newVisible = [
-      ...without.slice(0, insertAt),
-      draggedTodo,
-      ...without.slice(insertAt),
-    ];
+    const newVisible = [...without.slice(0, insertAt), draggedTodo, ...without.slice(insertAt)];
 
-    // A drop back onto the same slot is a no-op
-    if (newVisible.every((t, i) => visible[i]?.id === t.id)) return;
+    // A drop back onto the same slot is a no-op.
+    if (newVisible.every((t, i) => visible[i].id === t.id)) return;
 
-    const newFull = applyVisibleOrder(this.service.allTodos(), visible, newVisible);
-    void this.service.reorder(newFull);
+    void this.service.reorder(applyVisibleOrder(this.service.allTodos(), visible, newVisible));
   }
 
   protected onDragEnd(): void {
@@ -429,38 +364,32 @@ export class Todos implements OnInit {
     this.dropTarget.set(null);
   }
 
-  /** Find which row and side the pointer is over. */
-  private findDropTarget(y: number, draggedId: string): { id: string; side: 'before' | 'after' } {
-    const items = document.querySelectorAll('.item');
-    let best: { id: string; side: 'before' | 'after' } | null = null;
+  /**
+   * Find the row (other than the dragged one) whose midpoint is nearest the
+   * pointer, and which side of it the pointer is on. Pointers above or below
+   * the list resolve to the first/last row.
+   */
+  private findDropTarget(y: number, draggedId: string): DropTarget | null {
+    let best: DropTarget | null = null;
     let bestDist = Infinity;
 
-    items.forEach((el) => {
-      const row = el as HTMLElement;
+    for (const row of this.host.nativeElement.querySelectorAll<HTMLElement>('.item')) {
       const id = row.dataset['id'];
-      if (!id || id === draggedId) return;
+      if (!id || id === draggedId) continue;
 
       const rect = row.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
       const dist = Math.abs(y - midY);
-
-      if (dist < bestDist && y >= rect.top - 10 && y <= rect.bottom + 10) {
+      if (dist < bestDist) {
         bestDist = dist;
         best = { id, side: y < midY ? 'before' : 'after' };
       }
-    });
-
-    // Fallback: if no row found, return first visible item
-    if (!best) {
-      const first = this.todos()[0];
-      return { id: first.id, side: 'before' };
     }
     return best;
   }
 
   /** Alt+ArrowUp/ArrowDown on a row's handle: move it one visible slot. */
-  protected onKeyMove(todo: Todo, dir: number): void {
-    const step = dir < 0 ? -1 : 1;
+  protected onKeyMove(todo: Todo, step: -1 | 1): void {
     const visible = this.todos();
     const from = visible.findIndex((t) => t.id === todo.id);
     const to = from + step;
@@ -470,8 +399,7 @@ export class Todos implements OnInit {
     }
     const newVisible = [...visible];
     [newVisible[from], newVisible[to]] = [newVisible[to], newVisible[from]];
-    const newFull = applyVisibleOrder(this.service.allTodos(), visible, newVisible);
-    void this.service.reorder(newFull);
+    void this.service.reorder(applyVisibleOrder(this.service.allTodos(), visible, newVisible));
     this.announce.set(`${todo.title} moved to position ${to + 1} of ${visible.length}`);
   }
 }

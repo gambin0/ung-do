@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotificationService } from './notification-service';
+import { NotificationService, legacyNotificationId, notificationId } from './notification-service';
 import { Todo } from './todo';
 
 let callCount = 0;
@@ -49,7 +49,7 @@ describe('NotificationService', () => {
     const svc = new NotificationService();
     const now = new Date();
     const dueTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Test',
       completed: false,
       createdAt: now.toISOString(),
@@ -65,7 +65,7 @@ describe('NotificationService', () => {
 
     const now = new Date();
     const dueTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Test task',
       completed: false,
       createdAt: now.toISOString(),
@@ -84,7 +84,7 @@ describe('NotificationService', () => {
 
     const now = new Date();
     const completedTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Done task',
       completed: true,
       createdAt: now.toISOString(),
@@ -101,7 +101,7 @@ describe('NotificationService', () => {
 
     const now = new Date();
     const futureTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Future task',
       completed: false,
       createdAt: now.toISOString(),
@@ -118,7 +118,7 @@ describe('NotificationService', () => {
 
     const now = new Date();
     const dueTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Test',
       completed: false,
       createdAt: now.toISOString(),
@@ -130,13 +130,13 @@ describe('NotificationService', () => {
     expect(callCount).toBe(1);
   });
 
-  it('notifies again after forget() is called', async () => {
+  it('notifies again after the notification is cancelled', async () => {
     const svc = new NotificationService();
     await svc.requestPermission();
 
     const now = new Date();
     const dueTodo: Todo = {
-      id: 1,
+      id: '1',
       title: 'Test',
       completed: false,
       createdAt: now.toISOString(),
@@ -146,7 +146,7 @@ describe('NotificationService', () => {
     svc.checkDueTodos([dueTodo]);
     expect(callCount).toBe(1);
 
-    svc.forget(1);
+    await svc.cancelTodoNotification(dueTodo);
     svc.checkDueTodos([dueTodo]);
     expect(callCount).toBe(2);
   });
@@ -157,11 +157,50 @@ describe('NotificationService', () => {
 
     const now = new Date();
     const todos: Todo[] = [
-      { id: 1, title: 'A', completed: false, createdAt: now.toISOString(), dueAt: new Date(now.getTime() - 60000).toISOString() },
-      { id: 2, title: 'B', completed: false, createdAt: now.toISOString(), dueAt: new Date(now.getTime() - 60000).toISOString() },
+      {
+        id: '1',
+        title: 'A',
+        completed: false,
+        createdAt: now.toISOString(),
+        dueAt: new Date(now.getTime() - 60000).toISOString(),
+      },
+      {
+        id: '2',
+        title: 'B',
+        completed: false,
+        createdAt: now.toISOString(),
+        dueAt: new Date(now.getTime() - 60000).toISOString(),
+      },
     ];
 
     svc.checkDueTodos(todos);
     expect(callCount).toBe(2);
+  });
+});
+
+describe('notification IDs', () => {
+  /** The exact formula shipped in earlier versions. */
+  function oldFormula(todoId: string): number {
+    let hash = 0;
+    for (let i = 0; i < todoId.length; i++) {
+      hash = (hash << 5) - hash + todoId.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return Math.abs(hash) % 100000;
+  }
+
+  const ids = ['Xk3pQ9vLm2', 'aaaaaaaaaaaaaaaaaaaa', 'z', 'Q7rT0nB1cD4eF5gH6iJ8'];
+
+  it('matches the old formula for legacy IDs so old reminders can be cancelled', () => {
+    for (const id of ids) expect(legacyNotificationId(id)).toBe(oldFormula(id));
+  });
+
+  it('produces positive 32-bit IDs outside the legacy range', () => {
+    for (const id of ids) {
+      const n = notificationId(id);
+      expect(Number.isInteger(n)).toBe(true);
+      expect(n).toBeGreaterThanOrEqual(100000);
+      expect(n).toBeLessThanOrEqual(0x7fffffff);
+    }
   });
 });

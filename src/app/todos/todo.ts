@@ -1,13 +1,15 @@
-/** A single to-do as returned by the local API. */
+/** A single to-do as stored in Firestore. */
 export interface Todo {
   id: string;
   title: string;
   completed: boolean;
-  /** ISO-8601 timestamp from the server. */
+  /** ISO-8601 creation timestamp. */
   createdAt: string;
-  /** ISO-8601 timestamp for due date, or null. */
+  /** ISO-8601 due timestamp, or null when no due date is set. */
   dueAt?: string | null;
+  /** Manual sort position (ascending). Missing on to-dos never reordered. */
+  order?: number;
 }
 
-/** Display filters supported by both the UI and the API. */
+/** Display filters supported by the UI. */
 export type Filter = 'all' | 'active' | 'completed';

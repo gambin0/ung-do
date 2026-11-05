@@ -1,23 +1,37 @@
 import { Service, signal } from '@angular/core';
-import { Todo } from './todo';
 import { Capacitor } from '@capacitor/core';
-import {
-  LocalNotifications,
-  ScheduleOptions,
-} from '@capacitor/local-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Todo } from './todo';
+
+const NOTIFICATION_TITLE = 'ung-do reminder';
+
+/** Java-style 32-bit string hash. */
+function hash32(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (Math.imul(31, hash) + value.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+/** Notification IDs below this are reserved for the legacy scheme. */
+const LEGACY_ID_LIMIT = 100_000;
+const MAX_INT32 = 0x7fffffff;
 
 /**
- * Generate a stable numeric notification ID from a todo ID string.
- * Uses a simple hash to avoid collisions.
+ * Stable notification ID for a todo. Android needs a positive 32-bit int; using
+ * the full range (rather than the old mod-100k) makes collisions negligible.
  */
-function todoIdToNotificationId(todoId: string): number {
-  let hash = 0;
-  for (let i = 0; i < todoId.length; i++) {
-    const char = todoId.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash) % 100000;
+export function notificationId(todoId: string): number {
+  return LEGACY_ID_LIMIT + ((hash32(todoId) >>> 0) % (MAX_INT32 - LEGACY_ID_LIMIT));
+}
+
+/**
+ * The ID older app versions used. Reminders scheduled by them are cancelled
+ * whenever the todo's reminder is rescheduled or cancelled, so none are orphaned.
+ */
+export function legacyNotificationId(todoId: string): number {
+  return Math.abs(hash32(todoId)) % LEGACY_ID_LIMIT;
 }
 
 /**
@@ -27,19 +41,23 @@ function todoIdToNotificationId(todoId: string): number {
  */
 @Service({ autoProvided: true })
 export class NotificationService {
-  /** Whether the user has granted notification permission. */
-  readonly permission = signal<'default' | 'granted' | 'denied'>('default');
+  private readonly isMobile = ['android', 'ios'].includes(Capacitor.getPlatform());
+
+  /**
+   * Whether the user has granted notification permission. On web this starts
+   * from the browser's remembered decision so reminders keep working after a reload.
+   */
+  readonly permission = signal<NotificationPermission>(
+    !this.isMobile && typeof Notification !== 'undefined' ? Notification.permission : 'default',
+  );
 
   /** IDs of todos we've already notified about (web fallback only). */
-  private notifiedIds = new Set<string>();
-
-  private platform = Capacitor.getPlatform();
-  private isMobile = this.platform === 'android' || this.platform === 'ios';
+  private readonly notifiedIds = new Set<string>();
 
   /**
    * Request notification permission.
    */
-  async requestPermission(): Promise<'granted' | 'denied' | 'default'> {
+  async requestPermission(): Promise<NotificationPermission> {
     if (this.isMobile) {
       const status = await LocalNotifications.requestPermissions();
       const granted = status.display === 'granted';
@@ -72,19 +90,18 @@ export class NotificationService {
     }
 
     if (this.isMobile) {
-      const options: ScheduleOptions = {
-        notifications: [
-          {
-            id: todoIdToNotificationId(todo.id),
-            title: 'ung-do reminder',
-            body: todo.title,
-            schedule: { at: dueDate },
-          },
-        ],
-      };
+      await this.cancelMobile(todo.id, { legacyOnly: true });
       try {
-        await LocalNotifications.schedule(options);
-        console.log('Scheduled notification for todo', todo.id, 'at', dueDate.toISOString());
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: notificationId(todo.id),
+              title: NOTIFICATION_TITLE,
+              body: todo.title,
+              schedule: { at: dueDate },
+            },
+          ],
+        });
       } catch (e) {
         console.error('Failed to schedule notification:', e);
       }
@@ -96,15 +113,19 @@ export class NotificationService {
    * Call when a todo is completed or its due date changes.
    */
   async cancelTodoNotification(todo: Todo): Promise<void> {
-    if (this.isMobile) {
-      const id = todoIdToNotificationId(todo.id);
-      try {
-        await LocalNotifications.cancel({ notifications: [{ id }] });
-      } catch (e) {
-        console.error('Failed to cancel notification:', e);
-      }
-    }
+    if (this.isMobile) await this.cancelMobile(todo.id);
     this.notifiedIds.delete(todo.id);
+  }
+
+  private async cancelMobile(todoId: string, { legacyOnly = false } = {}): Promise<void> {
+    const ids = legacyOnly
+      ? [legacyNotificationId(todoId)]
+      : [notificationId(todoId), legacyNotificationId(todoId)];
+    try {
+      await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
+    } catch (e) {
+      console.error('Failed to cancel notification:', e);
+    }
   }
 
   /**
@@ -135,12 +156,13 @@ export class NotificationService {
    */
   private async fireTodoNotification(todo: Todo): Promise<void> {
     if (this.isMobile) {
+      await this.cancelMobile(todo.id, { legacyOnly: true });
       try {
         await LocalNotifications.schedule({
           notifications: [
             {
-              id: todoIdToNotificationId(todo.id),
-              title: 'ung-do reminder',
+              id: notificationId(todo.id),
+              title: NOTIFICATION_TITLE,
               body: todo.title,
             },
           ],
@@ -148,8 +170,9 @@ export class NotificationService {
       } catch (e) {
         console.error('Failed to fire notification:', e);
       }
-    } else {
+    } else if (this.permission() === 'granted' && !this.notifiedIds.has(todo.id)) {
       this.fireWebNotification(todo);
+      this.notifiedIds.add(todo.id);
     }
   }
 
@@ -158,7 +181,7 @@ export class NotificationService {
    */
   private fireWebNotification(todo: Todo): void {
     try {
-      const notification = new Notification('ung-do reminder', {
+      const notification = new Notification(NOTIFICATION_TITLE, {
         body: todo.title,
         icon: '/favicon.ico',
         tag: `todo-${todo.id}`,
@@ -170,19 +193,5 @@ export class NotificationService {
     } catch (e) {
       console.error('Failed to fire notification:', e);
     }
-  }
-
-  /**
-   * Forget a todo's notification status (web fallback only).
-   */
-  forget(id: string): void {
-    this.notifiedIds.delete(id);
-  }
-
-  /**
-   * Reset all notified IDs (web fallback only).
-   */
-  reset(): void {
-    this.notifiedIds.clear();
   }
 }

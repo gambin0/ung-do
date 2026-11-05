@@ -1,4 +1,13 @@
-import { Component, input, output, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Todo } from './todo';
@@ -11,7 +20,7 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** A single to-do row: drag handle, animated completion toggle, title (inline-editable), delete. */
+/** A single to-do row: drag handle, completion toggle, inline-editable title and due date, delete. */
 @Component({
   selector: 'app-todo-item',
   imports: [FormsModule, MatIconModule],
@@ -24,13 +33,15 @@ function toDatetimeLocal(iso: string): string {
       [class.drop-before]="dropSide() === 'before'"
       [class.drop-after]="dropSide() === 'after'"
       [class.is-overdue]="isOverdue(todo())"
-      role="listitem"
     >
       <div class="item-main">
         <button
           type="button"
           class="handle"
           (pointerdown)="onPointerDown($event)"
+          (pointermove)="onPointerMove($event)"
+          (pointerup)="onPointerUp($event)"
+          (pointercancel)="onPointerCancel()"
           (keydown.alt.arrowup)="move.emit(-1)"
           (keydown.alt.arrowdown)="move.emit(1)"
           [aria-label]="'Reorder ' + todo().title + '. Press Alt and the arrow keys to move.'"
@@ -43,11 +54,11 @@ function toDatetimeLocal(iso: string): string {
           class="check"
           [checked]="todo().completed"
           (change)="toggle.emit(!todo().completed)"
-          [aria-label]="'Mark ' + todo().title + ' ' + (todo().completed ? 'not done' : 'complete')"
+          [aria-label]="'Mark ' + todo().title + ' as done'"
         />
 
         @if (editing()) {
-          <form class="editor" (ngSubmit)="save()">
+          <form class="editor" (ngSubmit)="save()" (keydown.escape)="closeEditor()">
             <input
               #edit
               name="edit-title"
@@ -63,7 +74,7 @@ function toDatetimeLocal(iso: string): string {
               [class.has-due]="dueDraft()"
               aria-label="Set or clear due date"
             >
-              <mat-icon>{{ dueDraft() ? 'event' : 'event' }}</mat-icon>
+              <mat-icon>event</mat-icon>
             </button>
             <input
               #editDueInput
@@ -74,13 +85,18 @@ function toDatetimeLocal(iso: string): string {
               (ngModelChange)="dueDraft.set($event)"
               aria-label="Edit due date and time"
             />
-            <button type="submit" class="editor-btn">Save</button>
+            @if (hasChanges()) {
+              <button type="submit" class="editor-btn">Save</button>
+            } @else {
+              <button type="button" class="editor-btn" (click)="closeEditor()">Cancel</button>
+            }
           </form>
         } @else {
           <button
+            #titleButton
             type="button"
             class="title"
-            (pointerup)="startEdit()"
+            (click)="startEdit()"
             [title]="'Edit ' + todo().title"
           >
             {{ todo().title }}
@@ -90,23 +106,23 @@ function toDatetimeLocal(iso: string): string {
         <button
           type="button"
           class="action delete"
-          (pointerup)="remove.emit()"
+          (click)="remove.emit()"
           [aria-label]="'Delete ' + todo().title"
         >
           <mat-icon>delete</mat-icon>
         </button>
       </div>
 
-      @if (todo().dueAt) {
+      @if (todo().dueAt; as dueAt) {
         <div class="item-footer">
           <span
             class="due-badge"
             [class.is-overdue]="isOverdue(todo())"
             [class.is-upcoming]="isUpcoming(todo())"
-            [title]="todo().dueAt"
+            [title]="dueAt"
           >
             <mat-icon>{{ isOverdue(todo()) ? 'warning' : 'schedule' }}</mat-icon>
-            {{ isOverdue(todo()) ? formatAgo(todo().dueAt!) : formatDueDate(todo().dueAt!) }}
+            {{ isOverdue(todo()) ? formatAgo(dueAt) : formatDueDate(dueAt) }}
           </span>
         </div>
       }
@@ -117,10 +133,12 @@ function toDatetimeLocal(iso: string): string {
 export class TodoItem {
   /** The to-do to render. */
   readonly todo = input.required<Todo>();
+  /** Where the drop indicator sits relative to this row, or null. */
+  readonly dropSide = input<'before' | 'after' | null>(null);
 
   /** Fired when the user toggles completion (emits the NEW desired state). */
   readonly toggle = output<boolean>();
-  /** Fired when the user saves an edited title (or nothing if unchanged). */
+  /** Fired when the user saves a changed, non-empty title. */
   readonly update = output<string>();
   /** Fired when the user changes the due date (null = cleared). */
   readonly updateDue = output<string | null>();
@@ -128,80 +146,96 @@ export class TodoItem {
   readonly remove = output<void>();
   /** Fired when a drag begins on this row. */
   readonly dragStart = output<{ id: string }>();
-  /** Fired when a drag started on this row ends (drop or cancel). */
+  /** Fired when a drag is cancelled by the browser (e.g. a scroll gesture takes over). */
   readonly dragEnd = output<void>();
   /** Fired by Alt+ArrowUp/ArrowDown on the handle: -1 = up, +1 = down. */
-  readonly move = output<number>();
-  /** Where the drop indicator sits relative to this row, or null. */
-  readonly dropSide = input<'before' | 'after' | null>(null);
-  /** Pointer is hovering this row with a drag in flight. */
+  readonly move = output<-1 | 1>();
+  /** Pointer is moving with a drag in flight. */
   readonly dragOver = output<{ id: string; y: number }>();
-  /** The pointer was released over this row. */
+  /** The pointer was released, ending the drag. */
   readonly dropped = output<{ id: string; y: number }>();
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
   protected readonly dueDraft = signal('');
-  /** True once the user presses the handle, so only armed rows are draggable. */
-  protected readonly armed = signal(false);
   protected readonly dragging = signal(false);
 
-  /** Expose time-utils functions to the template. */
-  protected isOverdue = isOverdue;
-  protected isUpcoming = isUpcoming;
-  protected formatDueDate = formatDueDate;
-  protected formatAgo = formatAgo;
+  private readonly editInput = viewChild<ElementRef<HTMLInputElement>>('edit');
+  private readonly titleButton = viewChild<ElementRef<HTMLButtonElement>>('titleButton');
+  /** Set when the editor closes so focus returns to the title instead of being lost. */
+  private restoreFocus = false;
 
-  protected clearDue(): void {
-    this.dueDraft.set('');
+  /** The current due date in datetime-local format ('' when unset). */
+  private readonly originalDue = computed(() => {
+    const due = this.todo().dueAt;
+    return due ? toDatetimeLocal(due) : '';
+  });
+  private readonly titleChanged = computed(() => {
+    const trimmed = this.draft().trim();
+    return trimmed !== '' && trimmed !== this.todo().title;
+  });
+  private readonly dueChanged = computed(() => this.dueDraft().trim() !== this.originalDue());
+  protected readonly hasChanges = computed(() => this.titleChanged() || this.dueChanged());
+
+  protected readonly isOverdue = isOverdue;
+  protected readonly isUpcoming = isUpcoming;
+  protected readonly formatDueDate = formatDueDate;
+  protected readonly formatAgo = formatAgo;
+
+  constructor() {
+    // Move focus into the editor when it opens, and back to the title when it closes.
+    effect(() => this.editInput()?.nativeElement.focus());
+    effect(() => {
+      const button = this.titleButton();
+      if (button && this.restoreFocus) {
+        this.restoreFocus = false;
+        button.nativeElement.focus();
+      }
+    });
   }
 
   protected onPointerDown(event: PointerEvent): void {
     event.preventDefault();
-    event.stopPropagation();
-
-    // Capture pointer to track movement on mobile
-    const handle = event.currentTarget as HTMLElement;
-    handle.setPointerCapture(event.pointerId);
-
+    // Capture so move/up events keep coming to the handle while dragging.
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     this.dragging.set(true);
     this.dragStart.emit({ id: this.todo().id });
+  }
 
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      this.dragOver.emit({ id: this.todo().id, y: moveEvent.clientY });
-    };
+  protected onPointerMove(event: PointerEvent): void {
+    if (!this.dragging()) return;
+    this.dragOver.emit({ id: this.todo().id, y: event.clientY });
+  }
 
-    const onPointerUp = (upEvent: PointerEvent) => {
-      handle.releasePointerCapture(upEvent.pointerId);
-      this.dragging.set(false);
-      this.dropped.emit({ id: this.todo().id, y: upEvent.clientY });
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-    };
+  protected onPointerUp(event: PointerEvent): void {
+    if (!this.dragging()) return;
+    this.dragging.set(false);
+    this.dropped.emit({ id: this.todo().id, y: event.clientY });
+  }
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
+  protected onPointerCancel(): void {
+    if (!this.dragging()) return;
+    this.dragging.set(false);
+    this.dragEnd.emit();
   }
 
   protected startEdit(): void {
     this.draft.set(this.todo().title);
-    const due = this.todo().dueAt;
-    this.dueDraft.set(due ? toDatetimeLocal(due) : '');
+    this.dueDraft.set(this.originalDue());
     this.editing.set(true);
   }
 
   protected save(): void {
     if (!this.editing()) return;
-    const trimmed = this.draft().trim();
-    const due = this.todo().dueAt;
-    const originalDueStr = due ? toDatetimeLocal(due) : '';
-    const dueChanged = this.dueDraft().trim() !== originalDueStr;
+    const titleChanged = this.titleChanged();
+    const dueChanged = this.dueChanged();
+    this.closeEditor();
+    if (titleChanged) this.update.emit(this.draft().trim());
+    if (dueChanged) this.updateDue.emit(this.dueDraft().trim() || null);
+  }
+
+  protected closeEditor(): void {
+    this.restoreFocus = true;
     this.editing.set(false);
-    if (trimmed && trimmed !== this.todo().title) {
-      this.update.emit(trimmed);
-    }
-    if (dueChanged) {
-      this.updateDue.emit(this.dueDraft().trim() || null);
-    }
   }
 }

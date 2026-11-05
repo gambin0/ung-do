@@ -58,10 +58,9 @@
   border: none;
   border-radius: 9px;
   background: transparent;
-  color: #cbd5e1;
+  color: var(--ink-500);
   cursor: grab;
   touch-action: none;
-  opacity: 0.55;
   transition:
     opacity 0.18s ease,
     color 0.18s ease,
@@ -70,10 +69,6 @@
 .handle .material-symbols-outlined {
   font-size: 21px;
   transition: transform 0.18s ease;
-}
-.item:hover .handle,
-.handle:focus-visible {
-  opacity: 1;
 }
 .handle:hover {
   color: var(--brand-500);
@@ -151,13 +146,13 @@
   color: var(--brand-600);
 }
 .item.is-completed .title {
-  color: var(--ink-400);
+  color: var(--ink-500);
   text-decoration: line-through;
   text-decoration-color: rgba(148, 163, 184, 0.8);
   text-decoration-thickness: 2px;
 }
 .item.is-completed .title:hover {
-  color: var(--ink-400);
+  color: var(--ink-500);
 }
 
 /* ---- Due date badge ---------------------------------------------------- */
@@ -221,9 +216,11 @@
   font-size: 0.78rem;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-600));
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.18s ease;
 }
 .editor-btn:hover {
   box-shadow: 0 6px 14px -6px rgba(37, 99, 235, 0.7);
@@ -242,10 +239,12 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink-400);
+  color: var(--ink-500);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .editor-due-btn:hover {
   background: rgba(59, 130, 246, 0.1);
@@ -300,7 +299,7 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: var(--ink-400);
+  color: var(--ink-500);
   cursor: pointer;
   opacity: 0;
   transform: translateX(4px);
@@ -340,7 +339,8 @@
 @media (prefers-reduced-motion: reduce) {
   .item,
   .check,
-  .check .material-symbols-outlined,
+  .handle,
+  .title,
   .action,
   .action .material-symbols-outlined,
   .editor-btn {

@@ -2,15 +2,15 @@ import { applyVisibleOrder } from './order';
 import { Todo } from './todo';
 
 const t = (id: number, completed = false): Todo => ({
-  id,
+  id: String(id),
   title: `todo-${id}`,
   completed,
   createdAt: '2026-01-01T00:00:00Z',
 });
 
 const FULL: Todo[] = [t(1), t(2, true), t(3), t(4, true), t(5)];
-const byId = (ids: number[]): Todo[] => ids.map((id) => FULL.find((x) => x.id === id)!);
-const ids = (rows: Todo[]): number[] => rows.map((r) => r.id);
+const byId = (ids: number[]): Todo[] => ids.map((id) => FULL.find((x) => x.id === String(id))!);
+const ids = (rows: Todo[]): number[] => rows.map((r) => Number(r.id));
 
 describe('applyVisibleOrder', () => {
   it('reorders a mid-list move in an unfiltered view', () => {
