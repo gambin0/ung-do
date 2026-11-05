@@ -1,8 +1,7 @@
 import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Router } from '@angular/router';
-import { AuthService } from '../auth/auth-service';
+import { MainNav } from '../main-nav';
 import { TodoItem } from './todo-item';
 import { TodoService } from './todo-service';
 import { NotificationService } from './notification-service';
@@ -37,10 +36,11 @@ type DropTarget = { id: string; side: 'before' | 'after' };
  */
 @Component({
   selector: 'app-todos',
-  imports: [FormsModule, MatIconModule, TodoItem],
+  imports: [FormsModule, MainNav, MatIconModule, TodoItem],
   template: `
     <div class="page">
       <div class="shell">
+        <app-main-nav />
         <header class="masthead">
           <div class="brand">
             <span class="brand-mark">
@@ -180,8 +180,6 @@ type DropTarget = { id: string; side: 'before' | 'after' };
           <span>Stored in Firebase Firestore</span>
           <span class="dot">•</span>
           <span>syncs across your devices</span>
-          <span class="dot">•</span>
-          <button type="button" class="link-btn" (click)="signOut()">Sign out</button>
         </footer>
       </div>
     </div>
@@ -191,8 +189,6 @@ type DropTarget = { id: string; side: 'before' | 'after' };
 export class Todos implements OnInit, OnDestroy {
   protected readonly service = inject(TodoService);
   private readonly notifications = inject(NotificationService);
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly FILTERS = FILTERS;
@@ -242,12 +238,6 @@ export class Todos implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     clearInterval(this.checkInterval);
-  }
-
-  protected async signOut(): Promise<void> {
-    await this.auth.signOut();
-    this.service.clear();
-    await this.router.navigateByUrl('/sign-in');
   }
 
   protected load(): Promise<void> {

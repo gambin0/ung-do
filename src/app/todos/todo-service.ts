@@ -4,19 +4,14 @@ import {
   QueryDocumentSnapshot,
   Timestamp,
   addDoc,
-  collection,
   deleteDoc,
   doc,
   getDocs,
-  getFirestore,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { Filter, Todo } from './todo';
-import { firebaseApp } from '../firebase';
-
-const db = getFirestore(firebaseApp);
-const todosRef = collection(db, 'todos');
+import { db, todosRef } from '../firestore';
 
 /** Firestore timestamps (or legacy epoch-millis numbers) to ISO strings. */
 function toIso(value: unknown): string | null {

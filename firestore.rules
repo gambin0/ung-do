@@ -16,9 +16,24 @@ service cloud.firestore {
         && data.completed is bool;
     }
 
+    function isValidItem(data) {
+      return data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 200
+        && data.quantity is int
+        && data.quantity >= 0
+        && data.quantity <= 1000000
+        && (data.category == null || (data.category is string && data.category.size() <= 100));
+    }
+
     match /todos/{todoId} {
       allow read, delete: if isOwner();
       allow create, update: if isOwner() && isValidTodo(request.resource.data);
+    }
+
+    match /inventory/{itemId} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && isValidItem(request.resource.data);
     }
 
     // Everything else is denied by default.

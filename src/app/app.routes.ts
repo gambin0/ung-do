@@ -12,5 +12,10 @@ export const routes: Routes = [
     canActivate: [signedInGuard],
     loadComponent: () => import('./todos/todos').then((m) => m.Todos),
   },
+  {
+    path: 'inventory',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./inventory/inventory').then((m) => m.Inventory),
+  },
   { path: '**', redirectTo: '' },
 ];

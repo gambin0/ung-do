@@ -80,7 +80,7 @@ describe('Todos component', () => {
 
   it('marks the active filter with aria-pressed', async () => {
     const { el, fixture } = await render(mockService(SAMPLE));
-    const segments = el.querySelectorAll<HTMLButtonElement>('.segment');
+    const segments = el.querySelectorAll<HTMLButtonElement>('.toolbar .segment');
     segments[1].click();
     fixture.detectChanges();
     expect(segments[0].getAttribute('aria-pressed')).toBe('false');
@@ -120,7 +120,7 @@ describe('Todos component', () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
 
-    el.querySelector<HTMLButtonElement>('.link-btn')!.click();
+    el.querySelector<HTMLButtonElement>('app-main-nav button')!.click();
     await fixture.whenStable();
 
     expect(TestBed.inject(AuthService).signOut).toHaveBeenCalled();
