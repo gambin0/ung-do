@@ -59,6 +59,20 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use `@Service({ autoProvided: true })` for singleton services (Angular v22+)
 - Use the `inject()` function instead of constructor injection
 
+## Domain Capsules
+
+Before making changes, consult the relevant domain capsules in `.pi/capsules/` for deep context:
+
+- **`00-application-overview.md`** - What ung-do is, core features, target users
+- **`01-architecture.md`** - Component hierarchy, service layer, data flow, routing
+- **`02-domain-model.md`** - Todo/InventoryItem entities, relationships, business rules
+- **`03-conventions.md`** - TypeScript, Angular, styling, testing, Firebase conventions
+- **`04-firebase-firestore.md`** - Firebase setup, auth, CRUD operations, document mapping
+- **`05-mobile-capacitor.md`** - Build workflow, platform detection, mobile features
+- **`06-notifications.md`** - Mobile/web notification strategies, ID generation
+
+Load capsules relevant to your task. For general changes, start with `03-conventions.md`.
+
 ## Project Documentation
 
 Before making changes, consult the project documentation:
@@ -87,11 +101,13 @@ Before making changes, consult the project documentation:
 ## Common Tasks
 
 ### Build & Run (Web)
+
 ```bash
 npm run dev  # Starts web UI on :4200
 ```
 
 ### Build & Deploy (Android)
+
 ```bash
 npm run build
 npm run cap:sync
@@ -100,6 +116,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ### Testing
+
 ```bash
 npm test
 ```

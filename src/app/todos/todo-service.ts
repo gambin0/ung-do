@@ -33,8 +33,8 @@ function fromDoc(snap: QueryDocumentSnapshot<DocumentData>): Todo {
 }
 
 /**
- * Manually ordered to-dos first (by `order`), then never-reordered ones,
- * newest first. New to-dos get an `order` below the current minimum so they
+ * Never-reordered to-dos first (newest first), then manually ordered ones
+ * by `order`. New to-dos get an `order` below the current minimum so they
  * land at the top.
  */
 function compareTodos(a: Todo, b: Todo): number {
